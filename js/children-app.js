@@ -149,7 +149,9 @@ function modal({ title, content, showCancel = true, confirmText = '确定', canc
                     ${showCancel ? `<button class="modal-btn cancel">${escapeHtml(cancelText)}</button>` : ''}
                     <button class="modal-btn confirm" ${confirmColor ? `style="color:${confirmColor}"` : ''}>${escapeHtml(confirmText)}</button>
                 </div>
-            </div>`;
+            
+            <div class="card"><div class="card-title">👴 老人看板</div><div id="elderly-dashboard"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+        <div class="card"><div class="card-title">已购课程</div><div id="elderly-purchases"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div></div>`;
         document.body.appendChild(mask);
         mask.querySelector('.confirm').onclick = () => { mask.remove(); resolve({ confirm: true }); };
         const cb = mask.querySelector('.cancel');
@@ -189,7 +191,89 @@ async function pullFromCloud() {
         console.warn('网络错误，使用本地数据', e);
     }
 }
-async function loginOrRegister(phone, password, isLogin) {
+
+function renderElderlyDash() {
+  var el = document.getElementById('elderly-dashboard');
+  if(!el) return;
+  var boundPhone = localStorage.getItem('boundElderlyPhone');
+  if(!boundPhone){
+    el.innerHTML = '<div style="display:flex;gap:8px;margin-bottom:8px;"><input id="bind-elderly-input" class="form-input" placeholder="输入老人手机号" style="flex:1;" /><button class="btn btn-primary" id="bind-elderly-btn" style="padding:6px 12px;white-space:nowrap;">绑定</button></div><div class="text-muted" style="text-align:center;font-size:13px;">绑定后查看老人今日健康数据与课程安排</div>';
+    var btn = document.getElementById('bind-elderly-btn');
+    if(btn) btn.onclick = function(){
+      var phone = document.getElementById('bind-elderly-input').value.trim();
+      if(!phone){ toast('请输入手机号'); return; }
+      localStorage.setItem('boundElderlyPhone', phone);
+      toast('已绑定');
+      renderElderlyDash();
+    };
+    var inp = document.getElementById('bind-elderly-input');
+    if(inp) inp.onkeypress = function(e){ if(e.key==='Enter' && document.getElementById('bind-elderly-btn')) document.getElementById('bind-elderly-btn').click(); };
+    return;
+  }
+  if(typeof currentUser === 'undefined' || !currentUser){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">请先登录</div>'; return; }
+  el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">加载中...</div>';
+  fetch(API_BASE+'/api/elderly/dashboard/'+encodeURIComponent(boundPhone),{
+    headers:{'Authorization':'Bearer '+currentUser.token}
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.error){
+      el.innerHTML = '<div style="margin-bottom:8px;"><div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">'+(d.error||'')+'</div><button class="btn btn-ghost btn-block" id="unbind-elderly-btn">解绑</button></div>';
+      var ub=document.getElementById('unbind-elderly-btn');
+      if(ub) ub.onclick=function(){localStorage.removeItem('boundElderlyPhone');renderElderlyDash();};
+      return;
+    }
+    var h='';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-weight:600;">📱 '+(d.name||d.phone)+'</span><button class="btn btn-ghost" onclick="renderElderlyDash()" style="padding:2px 10px;font-size:12px;">刷新</button></div>';
+    h += '<div style="font-size:14px;font-weight:500;margin-bottom:6px;">基本健康信息</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+    var items = [
+      {label:'\u8840\u538b',val:(d.healthData&&d.healthData.bloodPressure)||'--'},
+      {label:'\u5fc3\u7387',val:(d.healthData&&d.healthData.heartRate)||'--'},
+      {label:'\u8eab\u9ad8',val:(d.healthData&&d.healthData.height)||'--'},
+      {label:'\u4f53\u91cd',val:(d.healthData&&d.healthData.weight)||'--'}
+    ];
+    items.forEach(function(it){
+      h += '<div style="background:#f7f8fa;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:600;color:var(--primary);">'+it.val+'</div><div style="font-size:12px;color:var(--gray);margin-top:2px;">'+it.label+'</div></div>';
+    });
+    h += '</div>';
+    if(d.todayRecord && Object.keys(d.todayRecord).length > 0){
+      h += '<div style="font-size:14px;font-weight:500;margin-bottom:4px;margin-top:8px;">今日记录</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">';
+      var todayItems = [];
+      if(d.todayRecord.bp) todayItems.push({label:'\u8840\u538b',val:d.todayRecord.bp});
+      if(d.todayRecord.heartRate) todayItems.push({label:'\u5fc3\u7387',val:d.todayRecord.heartRate});
+      if(d.todayRecord.steps) todayItems.push({label:'\u6b65\u6570',val:d.todayRecord.steps});
+      if(d.todayRecord.sleep) todayItems.push({label:'\u7761\u7720',val:d.todayRecord.sleep});
+      if(d.todayRecord.bloodOxygen) todayItems.push({label:'\u8840\u6c27',val:d.todayRecord.bloodOxygen});
+      if(d.todayRecord.bloodSugar) todayItems.push({label:'\u8840\u7cd6',val:d.todayRecord.bloodSugar});
+      todayItems.forEach(function(it){
+        h += '<div style="background:#e8f5e9;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:18px;font-weight:600;color:var(--green);">'+it.val+'</div><div style="font-size:11px;color:var(--gray);">'+it.label+'</div></div>';
+      });
+      h += '</div>';
+    }
+    if(d.recentRecords && Object.keys(d.recentRecords).length > 0){
+      h += '<div style="font-size:14px;font-weight:500;margin-bottom:4px;margin-top:8px;">历史记录</div>';
+      var dates = Object.keys(d.recentRecords).reverse();
+      dates.forEach(function(date){
+        var rec = d.recentRecords[date];
+        var parts = [];
+        if(rec.bp) parts.push('\u8840\u538b:'+rec.bp);
+        if(rec.heartRate) parts.push('\u5fc3\u7387:'+rec.heartRate);
+        if(rec.steps) parts.push('\u6b65\u6570:'+rec.steps);
+        if(parts.length){
+          h += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f1f2;font-size:13px;"><span>'+date.slice(5)+'</span><span style="color:var(--gray);">'+parts.join(' ')+'</span></div>';
+        }
+      });
+      h += '</div>';
+    }
+    if(d.courses && d.courses.length){
+      h += '<div style="font-size:14px;font-weight:500;margin-bottom:4px;margin-top:8px;">课程安排</div>';
+      d.courses.forEach(function(c){
+        h += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid #f0f1f2;"><span>'+escapeHtml(c.name)+'</span><span style="color:var(--gray);">'+(c.time||'')+'</span></div>';
+      });
+    }
+    el.innerHTML = h;
+  });
+}async function loginOrRegister(phone, password, isLogin) {
     const url = isLogin ? '/api/login' : '/api/register';
     const res = await fetch(`${API_BASE}${url}`, {
         method: 'POST',
@@ -210,10 +294,9 @@ function logout() {
 }
 
 // ========== 路由 ==========
-const TABBAR_PAGES = ['home', 'sport', 'data', 'messages', 'me'];
+const TABBAR_PAGES = ['home', 'data', 'messages', 'me'];
 const TABBAR_LIST = [
     { key: 'home', text: '健康', icon: '❤️' },
-    { key: 'sport', text: '运动', icon: '🏃' },
     { key: 'data', text: '数据', icon: '📈' },
     { key: 'messages', text: '消息', icon: '💬' },
     { key: 'me', text: '我的', icon: '👤' }
@@ -355,37 +438,59 @@ async function registerWithRole(phone, password, role) {
 // 健康首页 (图片路径已修正)
 PAGES.home = (app) => {
     const p = storage.getProfile();
-    const name = (p && p.name) ? p.name : '张叔';
+    const name = (p && p.name) ? p.name : '家人';
     const signed = storage.isSignedToday();
     const streak = storage.signStreak();
-    const h = storage.getHealthData();
+    
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">颐路相伴</div><div class="header-subtitle">您好，${escapeHtml(name)} · 今日宜慢走</div></div></div>
-            <div class="banner"><div class="emoji">🍎</div><div><div class="t">健康小贴士</div><div class="s">老人健康与饮食的八大原则</div></div></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">颐路相伴</div><div class="header-subtitle">您好，${escapeHtml(name)}</div></div></div>
             <div class="card"><div class="card-title">今日打卡</div><div class="row space-between"><div><div class="fs-40 fw-600 text-orange" id="sign-status">${signed ? '今日已签到' : '还未签到'}</div><div class="text-muted mt-12">连续签到 <span id="streak-num">${streak}</span> 天</div></div><button class="btn btn-primary" id="sign-btn">${signed ? '已签到' : '去签到'}</button></div><div class="progress orange mt-20"><div id="sign-bar" style="width:${signed ? 100 : 30}%"></div></div></div>
-            <div class="grid-2"><div class="feature-tile orange" data-go="prescription"><div class="fi">🏃</div><div class="fn">运动方案</div></div><div class="feature-tile green" data-go="courses"><div class="fi">📘</div><div class="fn">我的课程</div></div></div>
-            <div class="emergency-tile" data-go="emergency"><div class="ei">📞</div><div class="et"><div class="en">一键紧急呼叫</div><div class="ed">一键通知紧急联系人与120急救</div></div><div class="ec">›</div></div>
-            <div class="card"><div class="card-title">今日健康数据</div><div class="ring-metric"><div class="ring"><div class="ring-text"><span class="big">${h.heartRate}</span>次/分</div></div><div><div class="fs-32 fw-600">心率 · 正常</div><div class="text-muted fs-28">今日均值 ${h.heartRate} 次/分</div></div></div><div class="row space-between mt-20"><div><div class="text-muted fs-28">血压</div><div class="fs-36 fw-600 text-green">${h.bloodPressure}</div></div><div><div class="text-muted fs-28">步数</div><div class="fs-36 fw-600 text-orange">${h.steps}</div></div><button class="btn btn-ghost" data-go="monitor" style="padding:6px 12px;">详情</button></div></div>
+            <div class="card"><div class="card-title">老人看板</div><div id="elderly-dashboard"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+            <div class="card"><div class="card-title">已购课程</div><div id="elderly-purchases"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
         </div>`;
+    
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
-  // 从服务器加载健康币
-  if(typeof currentUser !== 'undefined' && currentUser){
-    fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
-      var el = document.getElementById("coin-count-me");
-      if(el) el.textContent = (d.coins||0) + " 枚";
-    });
-  }
+    
+    // 从服务器加载健康币
+    if(typeof currentUser !== 'undefined' && currentUser){
+        fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
+            var el = document.getElementById("coin-count-me");
+            if(el) el.textContent = (d.coins||0) + " 枚";
+        });
+    }
+    
+    // Load elderly purchase records
+    if(typeof currentUser !== 'undefined' && currentUser){
+        fetch(API_BASE + '/api/my-elderly-purchases', {
+            headers: { 'Authorization': 'Bearer ' + currentUser.token }
+        }).then(function(r){return r.json();}).then(function(d){
+            var el = document.getElementById('elderly-purchases');
+            if(!el) return;
+            if(d.data && d.data.length){
+                var h = '';
+                d.data.forEach(function(p){
+                    h += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f1f2;"><span>'+(p.elderlyPhone||'')+'</span><span style="font-size:13px;color:var(--primary);">'+(p.courseName||'')+'</span></div>';
+                });
+                el.innerHTML = h;
+            } else {
+                el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">无</div>';
+            }
+        });
+    }
+    
+    // Load elderly dashboard
+    renderElderlyDash();
+    
+    // 签到按钮
     app.querySelector('#sign-btn').onclick = () => {
         if (storage.isSignedToday()) { toast('今天已经签到了'); return; }
         if (storage.addSignToday()) {
-          // 签到奖励发送到服务器
-          if(currentUser){
-            fetch(API_BASE+"/api/coins/signin",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
-              if(d.ok){console.log("签到+10健康币");}
-            });
-          }
-
+            if(currentUser){
+                fetch(API_BASE+"/api/coins/signin",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
+                    if(d.ok){console.log("签到+10健康币");}
+                });
+            }
             toast('签到成功 +10 健康币');
             app.querySelector('#sign-status').textContent = '今日已签到';
             app.querySelector('#streak-num').textContent = storage.signStreak();
@@ -395,101 +500,15 @@ PAGES.home = (app) => {
     };
 };
 
-PAGES.sport = (app) => {
-    const signed = storage.isSignedToday();
-    const streak = storage.signStreak();
-    app.innerHTML = `
-        <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">今日运动</div><div class="header-subtitle">${new Date().toLocaleDateString()}</div></div></div>
-            <div class="card" style="text-align:center;"><div class="text-muted">每日签到</div><div style="margin:16px;"><div class="sign-circle ${signed ? 'active' : ''}" id="sign-circle">${signed ? '✓' : '签到'}</div></div><div class="fs-36 fw-600 text-orange" id="sport-sign-text">${signed ? '今日已签到 · +10 健康币' : '点击签到'}</div><div class="text-muted mt-12">连续签到 <span id="sport-streak">${streak}</span> 天</div></div>
-            <div class="card"><div class="card-title">今日运动方案</div><div class="course-card"><div class="icon">🥋</div><div class="info"><div class="name">太极拳</div><div class="desc">低强度有氧 · 控制心率 ≤100</div></div><div class="fs-36">30 min</div></div></div>
-            <button class="btn btn-secondary btn-block" id="start-btn">我知道了 · 开始运动</button>
-        </div>`;
-    app.querySelector('#sign-circle').onclick = () => {
-        if (storage.isSignedToday()) { toast('今天已签到'); return; }
-        storage.addSignToday();
-          // 签到奖励
-          if(currentUser){
-            fetch(API_BASE+"/api/coins/signin",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();});
-          }
-        toast('签到成功 +10 健康币');
-        const c = app.querySelector('#sign-circle');
-        c.classList.add('active');
-        c.textContent = '✓';
-        app.querySelector('#sport-sign-text').textContent = '今日已签到 · +10 健康币';
-        app.querySelector('#sport-streak').textContent = storage.signStreak();
-    };
-    app.querySelector('#start-btn').onclick = () => toast('祝您运动愉快');
-};
+;
 
 PAGES.data = (app) => {
-  const recCount = Object.keys(storage.getDailyRecords()).length;
-  app.innerHTML = '<div class="container">'+
-    '<div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">健康数据</div><div class="header-subtitle">已记录 '+recCount+' 天</div></div></div>'+
-    '<div class="data-entry-tile" data-go="data-entry"><div class="dt-ic">📝</div><div class="dt-info"><div class="dt-name">录入当日数据</div><div class="dt-desc">血压 · 心率 · 步数 · 睡眠</div></div><div class="dt-arrow">›</div></div>'+
-    '<div class="data-entry-tile green" data-go="data-summary"><div class="dt-ic">📊</div><div class="dt-info"><div class="dt-name">周/月数据总结</div><div class="dt-desc">一周与一个月的趋势汇总</div></div><div class="dt-arrow">›</div></div>'+
-    '</div>';
-  app.querySelector('[data-go="data-entry"]').onclick = () => navigate('data-entry');
-  app.querySelector('[data-go="data-summary"]').onclick = () => navigate('data-summary');
+    app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">数据</div><div class="header-subtitle">等待添加新内容</div></div></div></div>';
 };
 
-PAGES['data-entry'] = (app) => {
-    setNavTitle('录入当日数据');
-    const today = new Date().toISOString().slice(0,10);
-    const existed = storage.getDailyRecord(today) || {};
-    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', steps: existed.steps || '5000', sleep: existed.sleep || '7', bloodOxygen: existed.bloodOxygen || '97', bloodSugar: existed.bloodSugar || '5.5' };
-    const fields = [
-        { key: 'bp', label: '血压', min: 60, max: 220, unit: 'mmHg', step: 1 },
-        { key: 'heartRate', label: '心率', min: 30, max: 220, unit: '次/分', step: 1 },
-        { key: 'steps', label: '步数', min: 0, max: 50000, unit: '步', step: 100 },
-        { key: 'sleep', label: '睡眠时长', min: 0, max: 24, unit: '小时', step: 0.5 },
-        { key: 'bloodOxygen', label: '血氧', min: 60, max: 100, unit: '%', step: 1 },
-        { key: 'bloodSugar', label: '血糖', min: 2, max: 30, unit: 'mmol/L', step: 0.1 }
-    ];
-    let html = '<div class="container"><div class="card"><div class="card-title">' + today + '</div>';
-    fields.forEach(f => {
-        html += '<div class="form-row" style="flex-wrap:wrap;"><div class="form-label" style="width:100%;margin-bottom:4px;">' + f.label + '</div><input type="range" data-f="' + f.key + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + form[f.key] + '" style="flex:1;"><span class="range-val" data-v="' + f.key + '" style="min-width:50px;text-align:right;font-weight:600;">' + form[f.key] + '</span><span style="width:40px;text-align:right;color:var(--gray);font-size:13px;">' + f.unit + '</span></div>';
-    });
-    html += '</div><button class="btn btn-primary btn-block" id="save-btn">保存</button></div>';
-    app.innerHTML = html;
-    app.querySelectorAll('input[type="range"]').forEach(el => {
-        el.oninput = () => { form[el.dataset.f] = el.value; var sp = app.querySelector('[data-v="' + el.dataset.f + '"]'); if(sp) sp.textContent = el.value; };
-    });
-    app.querySelector('#save-btn').onclick = () => { lsSet(KEYS.HEALTH_DATA,{heartRate:form.heartRate,bloodPressure:form.bp,steps:form.steps,sleepHours:form.sleep,bloodOxygen:form.bloodOxygen,bloodSugar:form.bloodSugar}); storage.saveDailyRecord(today, form);  toast('已保存'); navigate('data'); };
-};
+;
 
-PAGES['data-summary'] = (app) => {
-    setNavTitle('数据总结');
-    var allR = storage.getDailyRecords();
-    var dates = Object.keys(allR).sort();
-    var recent7 = dates.slice(-7);
-    if (recent7.length === 0) {
-        app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div><div class="text-muted" style="text-align:center;padding:40px;">暂无数据，请先录入</div></div><button class="btn btn-ghost btn-block" data-go="data-entry">去录入</button></div>';
-        app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
-        return;
-    }
-    var bpS=0,hrS=0,stS=0,slS=0, bpN=0,hrN=0,stN=0,slN=0;
-    recent7.forEach(function(d){
-        var r = allR[d];
-        if(r.bp && !isNaN(r.bp)){bpS+=+r.bp;bpN++;}
-        if(r.heartRate && !isNaN(r.heartRate)){hrS+=+r.heartRate;hrN++;}
-        if(r.steps && !isNaN(r.steps)){stS+=+r.steps;stN++;}
-        if(r.sleep && !isNaN(r.sleep)){slS+=+r.sleep;slN++;}
-    });
-    var avg = function(s,n){return n?(s/n).toFixed(1):'--';};
-    var rows = [
-        ['血压', avg(bpS,bpN), 'mmHg'],
-        ['心率', avg(hrS,hrN), '次/分'],
-        ['步数', avg(stS,stN), '步'],
-        ['睡眠时长', avg(slS,slN), '小时']
-    ];
-    var listHtml = '';
-    rows.forEach(function(r){listHtml += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;"><span>'+r[0]+'</span><span style="font-weight:600;color:var(--orange);">'+r[1]+' '+r[2]+'</span></div>';});
-    var dayHtml = '';
-    recent7.slice().reverse().forEach(function(d){var r=allR[d];dayHtml += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>'+d.slice(5)+'</span><span style="font-size:13px;color:var(--gray);">'+(r.bp||'--')+'/'+(r.heartRate||'--')+'/'+(r.steps||'--')+'/'+(r.sleep||'--')+'</span></div>';});
-    app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div>'+listHtml+'<div class="text-muted" style="font-size:12px;margin-top:4px;">基于最近 '+recent7.length+' 天的数据</div></div><div class="card"><div class="card-title">每日记录</div>'+dayHtml+'</div><button class="btn btn-ghost btn-block" data-go="data-entry">录入新数据</button></div>';
-    app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
-};
+;
 
 // 单聊相关
 const DEFAULT_GREETINGS = { '女儿': [{text:'爸，今天看到您的运动简报啦',mine:false}], '儿子': [{text:'爸，您这两天血压稳定多了',mine:false}] };
@@ -499,10 +518,34 @@ function latestMessageDescapeHtml(name) {
     const g = DEFAULT_GREETINGS[name];
     return g ? g[g.length-1].text : '';
 }
+
+function showEditContactModal(nm){
+  var ct=storage.getContacts();
+  var i=ct.findIndex(function(c){return c.name===nm;});
+  if(i<0){toast('联系人不存在');return;}
+  var co=ct[i];
+  var mk=document.createElement('div'); mk.className='modal-mask';
+  mk.innerHTML='<div class="modal"><div class="modal-title">编辑联系人</div><div style="padding:8px;"><input id="edit-name" class="form-input" style="margin-bottom:8px;" value="'+escapeHtml(co.name)+'"><input id="edit-phone" class="form-input" style="margin-bottom:8px;" value="'+escapeHtml(co.phone||'')+'"><select id="edit-relation" class="form-input" style="margin-bottom:8px;"><option value="\u957f\u8f88"'+(co.relation==='\u957f\u8f88'?' selected':'')+'>\u957f\u8f88</option><option value="\u7236\u6bcd"'+(co.relation==='\u7236\u6bcd'?' selected':'')+'>\u7236\u6bcd</option><option value="\u540c\u8f88"'+(co.relation==='\u540c\u8f88'?' selected':'')+'>\u540c\u8f88</option><option value="\u665a\u8f88"'+(co.relation==='\u665a\u8f88'?' selected':'')+'>\u665a\u8f88</option><option value="\u5176\u4ed6"'+(co.relation==='\u5176\u4ed6'?' selected':'')+'>\u5176\u4ed6</option></select></div><div class="modal-actions"><button class="modal-btn cancel">\u53d6\u6d88</button><button class="modal-btn confirm" style="color:var(--orange);">\u4fdd\u5b58</button></div></div>';
+  document.body.appendChild(mk);
+  mk.querySelector('.cancel').onclick=function(){mk.remove();};
+  mk.querySelector('.confirm').onclick=function(){
+    var ni=mk.querySelector('#edit-name').value.trim();
+    if(!ni){toast('\u8bf7\u8f93\u5165\u59d3\u540d');return;}
+    ct[i].name=ni;
+    ct[i].phone=mk.querySelector('#edit-phone').value.trim();
+    ct[i].relation=mk.querySelector('#edit-relation').value;
+    lsSet(KEYS.CONTACTS,ct);
+    if(currentUser)syncToCloud();
+    toast('\u5df2\u66f4\u65b0');
+    mk.remove();
+    render();
+  };
+}
+
 async function showAddContactModal() {
     const mask = document.createElement('div');
     mask.className = 'modal-mask';
-    mask.innerHTML = `<div class="modal"><div class="modal-title">添加联系人</div><div style="padding:8px;"><input id="new-name" placeholder="姓名" class="form-input" style="margin-bottom:12px;"><input id="new-avatar" placeholder="头像表情" class="form-input" value="👤"></div><div class="modal-actions"><button class="modal-btn cancel">取消</button><button class="modal-btn confirm" style="color:var(--orange);">添加</button></div></div>`;
+    mask.innerHTML = `<div class="modal"><div class="modal-title">添加联系人</div><div style="padding:8px;"><input id="new-name" placeholder="姓名" class="form-input" style="margin-bottom:12px;"><input id="new-phone" placeholder="手机号" class="form-input" style="margin-bottom:8px;"><select id="new-relation" class="form-input" style="margin-bottom:8px;"><option value="长辈">长辈</option><option value="父母">父母</option><option value="同辈">同辈</option><option value="晚辈">晚辈</option><option value="其他">其他</option></select><input id="new-avatar" placeholder="头像表情" class="form-input" value="👤"></div><div class="modal-actions"><button class="modal-btn cancel">取消</button><button class="modal-btn confirm" style="color:var(--orange);">添加</button></div></div>`;
     document.body.appendChild(mask);
     const nameInput = mask.querySelector('#new-name');
     const avatarInput = mask.querySelector('#new-avatar');
@@ -527,15 +570,56 @@ PAGES.messages = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">消息</div><div class="header-subtitle">${contacts.length} 位联系人</div></div><div class="header-add" id="add-contact-btn">＋</div></div>
             <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>🔍</span><input id="friend-search-input" class="form-input" placeholder="输入手机号搜索好友" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">搜索</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">👥</div><div><div class="t">群聊</div><div class="s">点击查看我的群聊</div></div></div>
             <div class="banner" id="assistant-btn"><div class="emoji">🤖</div><div><div class="t">安全助手</div><div class="s">智能健康顾问（支持语音）</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">🧠</div><div><div class="t">智能算法</div><div class="s">基于健康数据的营养运动建议</div></div></div>
-            <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div></div>`).join('')}</div>
+            <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">📩 好友请求</div><div id="friend-requests-list"></div></div>
+            <div class="card" id="friends-card" style="display:none;"><div class="card-title">👥 我的好友</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+            <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div><button class="edit-contact-btn" data-name="${escapeHtml(c.name)}" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px;">✎</button></div>`).join('')}</div>
         </div>`;
     app.querySelectorAll('.list-item').forEach(el => el.onclick = () => navigate('chat', { name: el.dataset.name }));
+    app.querySelectorAll('.edit-contact-btn').forEach(function(el){ el.onclick = function(e){ e.stopPropagation(); showEditContactModal(this.dataset.name); }; });
     app.querySelector('#add-contact-btn').onclick = showAddContactModal;
     app.querySelector('#group-list-btn').onclick = () => navigate('group-list');
     app.querySelector('#assistant-btn').onclick = () => navigate('assistant');
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
+    // Load friend requests and friends
+    if(typeof currentUser !== 'undefined' && currentUser && currentUser.token){
+      fetch(API_BASE+'/api/friend/requests',{headers:{'Authorization':'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();}).then(function(d){
+          var card=document.getElementById('friend-requests-card');
+          var list=document.getElementById('friend-requests-list');
+          if(!card||!list)return;
+          if(d.data&&d.data.length){
+            card.style.display='';
+            var html='';
+            d.data.forEach(function(req){
+              var nm=req.fromName||req.from;
+              html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f2;">';
+              html+='<span>👤 '+escapeHtml(nm)+'</span>';
+              html+='<div><button class="btn btn-primary" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="acceptFriend(\''+req.from+'\')">接受</button>';
+              html+='<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="rejectFriend(\''+req.from+'\')">拒绝</button></div></div>';
+            });
+            list.innerHTML=html;
+          } else { card.style.display='none'; }
+        });
+      fetch(API_BASE+'/api/friends',{headers:{'Authorization':'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();}).then(function(d){
+          var list=document.getElementById('friends-list');
+          if(!list)return;
+          if(d.data&&d.data.length){
+            var card=document.getElementById('friends-card');
+            if(card) card.style.display='';
+            list.innerHTML=d.data.map(function(f){
+              var nm=f.name||f.phone;
+              return '<div class="list-item" data-friend="'+escapeHtml(f.phone)+'"><div class="avatar">👤</div><div class="list-content"><div class="list-name">'+escapeHtml(nm)+'</div><div class="list-desc">'+escapeHtml(f.lastMessage||'暂无消息')+'</div></div></div>';
+            }).join('');
+            list.querySelectorAll('.list-item').forEach(function(el){
+              el.onclick=function(){ var nm=this.querySelector('.list-name').textContent; navigate('chat',{name:nm,phone:this.dataset.friend}); };
+            });
+          } else { if(document.getElementById('friends-card')) document.getElementById('friends-card').style.display='none'; }
+        });
+    }
+
 };
 
 PAGES.chat = (app, params) => {
@@ -544,8 +628,22 @@ PAGES.chat = (app, params) => {
     
     // 字体控制
     const fontSize = storage.getFontSize();
-    setNavRight(`<div class="font-control"><button class="font-btn" id="font-minus">A-</button><span id="font-size-value" style="margin:0 4px;">${fontSize}px</span><button class="font-btn" id="font-plus">A+</button></div>`, null);
+    setNavRight(`<button class="font-btn" id="set-identity-btn" style="font-size:12px;margin-right:8px;">🏷 身份</button><div class="font-control"><button class="font-btn" id="font-minus">A-</button><span id="font-size-value" style="margin:0 4px;">${fontSize}px</span><button class="font-btn" id="font-plus">A+</button></div>`, null);
     const rightArea = document.getElementById('navbar-right');
+    // 设置身份按钮
+    setTimeout(function(){
+      var idBtn = document.getElementById('set-identity-btn');
+      if(idBtn) idBtn.onclick = function(){
+        var ct = storage.getContacts();
+        var co = ct.find(function(c){return c.phone === (params.phone||'') || c.name === params.name;});
+        if(!co){ toast('未找到该联系人')
+ct.push({name:params.name, phone:params.phone||'', avatar:'👤', bg:'', time:'刚刚', relation:'长辈'});
+lsSet(KEYS.CONTACTS,ct);
+co=ct[ct.length-1];
+}
+        showEditContactModal(co.name);
+      };
+    }, 200);
     if (rightArea && !rightArea.hasFontListener) {
         rightArea.hasFontListener = true;
         rightArea.addEventListener('click', (e) => {
@@ -1026,18 +1124,29 @@ PAGES.prescription = (app) => {
     if (!rx) { rx = storage.generatePrescription(storage.getProfile()); storage.setPrescription(rx); }
     app.innerHTML = `<div class="container"><div class="card"><div class="row"><div class="avatar orange">🥗</div><div><div class="fs-36 fw-600">${escapeHtml(rx.doctor)}</div><div class="text-muted">${escapeHtml(rx.hospital)}</div></div></div></div>
         <div class="card"><div class="card-title">运动方案</div><div class="prescription-box"><div>限制心率：≤ ${rx.maxHeartRate} 次/分</div><div>推荐项目：${(rx.items || []).join('、')}</div><div>频率：${rx.frequency}</div><div>时长：${rx.duration}</div><div>强度：${rx.intensity}</div><div>注意事项：${rx.cautions}</div></div></div>
-        <div class="card"><button class="btn btn-primary btn-block" data-go="sport">按方案开始运动</button><button class="btn btn-ghost btn-block" data-go="courses">预约线下课程</button></div></div>`;
+        <div class="card"><button class="btn btn-primary btn-block" >按方案开始运动</button><button class="btn btn-ghost btn-block" data-go="courses">预约线下课程</button></div></div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
 };
 PAGES.courses = (app) => {
-    setNavTitle('课程预约');
-    let selected = '大班体验课';
-    app.innerHTML = `<div class="container"><div class="banner orange"><div class="emoji">🎓</div><div><div class="t">平台智能推荐</div><div class="s">基于您的身体状况匹配</div></div></div>
-        <div class="card"><div class="course-card orange" data-name="大班体验课"><div class="icon">🏃</div><div class="info"><div class="name">大班体验课</div><div class="desc">12-16人低强度趣味课</div></div></div>
-        <div class="course-card" data-name="普通小班课"><div class="icon">👥</div><div class="info"><div class="name">普通小班课</div><div class="desc">8-10人中高强度训练</div></div></div></div>
-        <button class="btn btn-primary btn-block" id="book-btn">立即预约</button></div>`;
-    app.querySelectorAll('.course-card').forEach(el => el.onclick = () => { selected = el.dataset.name; toast(`已选择：${selected}`); });
-    app.querySelector('#book-btn').onclick = async () => { if ((await modal({ title: '预约确认', content: `是否预约${selected}？` })).confirm) toast('预约成功'); };
+    setNavTitle('我的课程');
+    app.innerHTML = '<div class="container"><div class="card"><div id="courses-content"><div class="chart-placeholder">加载中...</div></div></div></div>';
+    if(!currentUser) { document.getElementById('courses-content').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">请先登录</div>'; return; }
+    fetch(API_BASE + '/api/my-courses', { headers: { Authorization: 'Bearer ' + currentUser.token } })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.data && d.data.length) {
+          var html = '<div class="card-title">已购课程</div>' +
+            d.data.map(function(c) {
+              return '<div class="prescription-box" style="margin-bottom:10px;border-color:var(--orange);background:var(--orange-light);color:var(--text);"><div style="display:flex;align-items:center;"><div style="font-size:24px;margin-right:12px;">🎓</div><div><div style="font-size:16px;font-weight:600;">' + escapeHtml(c.name) + '</div><div style="font-size:13px;color:var(--gray);">' + escapeHtml(c.description||'') + '</div></div></div></div>';
+            }).join('');
+          document.getElementById('courses-content').innerHTML = html;
+        } else {
+          document.getElementById('courses-content').innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">暂无已购课程<br><span style="font-size:13px;">请联系子女为您购买课程</span></div>';
+        }
+      })
+      .catch(function(){
+        document.getElementById('courses-content').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败</div>';
+      });
 };
 
 PAGES.emergency = (app) => {
@@ -1278,6 +1387,7 @@ PAGES['profile-setup'] = (app) => {
           '</div>' +
         '</div></div>' +
         '<div class="card"><div class="card-title">身体状况</div><div class="check-row" id="chronic-row"><div class="check-box ' + (form.hasChronic ? 'checked' : '') + '">' + (form.hasChronic ? '✓' : '') + '</div><span>有基础病或慢性病史</span></div></div>' +
+        '<div class="card"><div class="card-title">健康建议</div><div id="advice-content"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">填写数据后点击下方按钮获取建议</div></div></div>' +
         '<button class="btn btn-primary btn-block" id="submit-btn">提交并生成运动方案</button></div>';
     app.querySelectorAll('[data-f]').forEach(function(el) { el.oninput = function() { form[el.dataset.f] = el.value; }; });
     app.querySelectorAll('input[type="range"]').forEach(function(el) {
@@ -1473,18 +1583,7 @@ PAGES.me = (app) => {
 // ── 付费服务页面 ──
 PAGES.services = (app) => {
   setNavTitle("付费服务");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div><div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div><div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div>' +
-      '<div class="card"><div class="card-title">为老人购买课程</div>' +
-      '<div class="form-row" style="border:none;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="flex:1;" /><button class="btn btn-primary" id="load-courses-btn" style="padding:6px 12px;">查询课程</button></div>' +
-      '<div id="courses-for-elderly"><div class="text-muted" style="text-align:center;padding:10px;">输入老人手机号后点击查询</div></div></div></div>';
-    // 为老人购买课程 - 绑定按钮事件
-    var lcb = document.getElementById('load-courses-btn');
-    if(lcb) {
-      lcb.onclick = loadCoursesForChildren;
-      var epi = document.getElementById('elderly-phone-input');
-      if(epi) epi.onkeypress = function(e) { if(e.key==='Enter') loadCoursesForChildren(); };
-    }
-
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div><div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div><div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div><div class="card"><div class="card-title">为老人购买课程</div><div style="display:flex;gap:8px;margin-bottom:6px;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="flex:1;" /><button class="btn btn-primary" id="load-courses-btn" style="padding:6px 12px;">查询课程</button></div><div id="quick-elderly-contacts"></div><div id="courses-for-elderly"><div class="text-muted" style="text-align:center;padding:8px;">输入老人手机号后点击查询</div></div></div></div>';
   // Load coin balance from server
   if(currentUser){
     fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
@@ -1514,53 +1613,24 @@ PAGES.services = (app) => {
       }
     });
   }
-};
 
-
-// 子女端 - 为老人购买课程
-async function loadCoursesForChildren() {
-  var container = document.getElementById('courses-for-elderly');
-  if(!container) return;
-  var elderlyPhone = document.getElementById('elderly-phone-input').value.trim();
-  if(!elderlyPhone){container.innerHTML='<div class="text-muted" style="text-align:center;padding:10px;">请先输入老人手机号</div>';return;}
-  container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">加载中...</div>';
-  
-  try {
-    // First verify the elderly user exists
-    var userRes = await fetch(API_BASE + '/api/user/search?phone=' + encodeURIComponent(elderlyPhone), {
-      headers: { Authorization: 'Bearer ' + currentUser.token }
-    });
-    var userData = await userRes.json();
-    if(!userRes.ok || !userData.user) {
-      container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;color:var(--red);">未找到该用户</div>';
-      return;
-    }
-    
-    // Load available courses
-    var res = await fetch(API_BASE + '/api/courses');
-    var d = await res.json();
-    if(d.data && d.data.length) {
-      var html = d.data.map(function(c) {
-        return '<div class="prescription-box" style="margin-bottom:10px;border-color:var(--orange);background:var(--orange-light);color:var(--text);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>' + escapeHtml(c.name) + '</strong><br><span style="font-size:14px;">' + c.price + ' 健康币</span><br><span style="font-size:13px;color:var(--gray);">' + escapeHtml(c.description||'') + '</span><br><span style="font-size:12px;color:var(--gray);">已报名 ' + (c.enrolled||0) + ' / ' + c.maxParticipants + ' 人</span></div><button class="btn btn-primary" style="font-size:14px;padding:8px 16px;" onclick=\'purchaseCourseForElderly("' + c.id + '","' + escapeHtml(elderlyPhone) + '")\'>立即购买</button></div></div>';
-      }).join('');
-      container.innerHTML = html;
-    } else {
-      container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">暂无可购买的课程</div>';
-    }
-  } catch(e) {
-    container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">网络错误</div>';
-  }
-}
-
-window.purchaseCourseForElderly = async function(courseId, elderlyPhone) {
-  if(!currentUser) { toast('请先登录'); return; }
-  var res = await fetch(API_BASE + '/api/course/purchase-for-elderly', {
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
-    body:JSON.stringify({courseId:courseId, elderlyPhone:elderlyPhone})
-  });
-  var d = await res.json();
-  if(d.ok) { toast('购买成功 ✅ 课程已同步到老人账号'); loadCoursesForChildren(); }
-  else toast(d.error || '购买失败');
+    // 为老人购买课程 - 绑定查询按钮
+    var lcb = document.getElementById('load-courses-btn');
+    if(lcb) lcb.onclick = loadCoursesForChildren;
+    var epi = document.getElementById('elderly-phone-input');
+    if(epi) epi.onkeypress = function(e) { if(e.key==='Enter' && document.getElementById('load-courses-btn')) document.getElementById('load-courses-btn').click(); };
+    // 快速选择长辈联系人
+    (function(){
+        var el = document.getElementById('quick-elderly-contacts');
+        if(!el) return;
+        var ecs = storage.getContacts().filter(function(c){ return c.phone && (c.relation === '\u957f\u8f88' || c.relation === '\u7236\u6bcd'); });
+        if(ecs.length === 0){ el.style.display='none'; return; }
+        el.style.display='';
+        var h = '<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 6px;"><span style="font-size:12px;color:var(--text-secondary);line-height:30px;margin-right:2px;">\u957f\u8f88\uff1a</span>';
+        ecs.forEach(function(c){ h += '<button class="btn btn-ghost" style="font-size:12px;padding:3px 10px;min-width:auto;margin:0;" onclick="document.getElementById(\'elderly-phone-input\').value=\''+c.phone+'\';document.getElementById(\'load-courses-btn\').click();">'+c.name+'</button>'; });
+        h += '</div>';
+        el.innerHTML = h;
+    })();
 };
 
 window.purchaseService = async function(id) {
@@ -1574,6 +1644,47 @@ window.purchaseService = async function(id) {
 };
 
 // ── 我的运动处方页面 ──
+
+async function loadCoursesForChildren() {
+  var container = document.getElementById('courses-for-elderly');
+  if(!container) return;
+  var elderlyPhone = document.getElementById('elderly-phone-input').value.trim();
+  if(!elderlyPhone){container.innerHTML='<div class="text-muted" style="text-align:center;padding:10px;">\u8bf7\u5148\u8f93\u5165\u8001\u4eba\u624b\u673a\u53f7</div>';return;}
+  container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">\u52a0\u8f7d\u4e2d...</div>';
+  try {
+    var userRes = await fetch(API_BASE + '/api/user/search?phone=' + encodeURIComponent(elderlyPhone), {
+      headers: { Authorization: 'Bearer ' + currentUser.token }
+    });
+    var userData = await userRes.json();
+    if(!userRes.ok || !userData.user) {
+      container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;color:var(--red);">\u672a\u627e\u5230\u8be5\u7528\u6237</div>';
+      return;
+    }
+    var res = await fetch(API_BASE + '/api/courses');
+    var d = await res.json();
+    if(d.data && d.data.length) {
+      var html = d.data.map(function(c) {
+        return '<div class="prescription-box" style="margin-bottom:10px;border-color:var(--orange);background:var(--orange-light);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>' + escapeHtml(c.name) + '</strong><br><span style="font-size:14px;">' + c.price + ' \u5065\u5eb7\u5e01</span><br><span style="font-size:13px;color:var(--gray);">' + escapeHtml(c.description||'') + '</span></div><button class="btn btn-primary" style="padding:8px 16px;" onclick=\'purchaseCourseForElderly("' + c.id + '","' + escapeHtml(elderlyPhone) + '")\'>\u7acb\u5373\u8d2d\u4e70</button></div></div>';
+      }).join('');
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">\u6682\u65e0\u53ef\u8d2d\u4e70\u7684\u8bfe\u7a0b</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">\u7f51\u7edc\u9519\u8bef</div>';
+  }
+}
+window.purchaseCourseForElderly = async function(courseId, elderlyPhone) {
+  if(!currentUser) { toast('\u8bf7\u5148\u767b\u5f55'); return; }
+  var res = await fetch(API_BASE + '/api/course/purchase-for-elderly', {
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+    body:JSON.stringify({courseId:courseId, elderlyPhone:elderlyPhone})
+  });
+  var d = await res.json();
+  if(d.ok) { toast('\u8d2d\u4e70\u6210\u529f \u2705 \u8bfe\u7a0b\u5df2\u540c\u6b65\u5230\u8001\u4eba\u8d26\u53f7'); loadCoursesForChildren(); }
+  else toast(d.error || '\u8d2d\u4e70\u5931\u8d25');
+};
+
 PAGES.myrx = (app) => {
   setNavTitle("我的运动处方");
   app.innerHTML = '<div class="container"><div id="rx-content"><div class="chart-placeholder">加载中...</div></div></div>';
@@ -1769,6 +1880,19 @@ window.customerService = function() {
     '<button onclick="this.parentNode.parentNode.remove()" style="background:#ff6b35;color:#fff;border:none;padding:10px 40px;border-radius:24px;font-size:16px;cursor:pointer;">我知道了</button>' +
   '</div>';
   document.body.appendChild(d);
+// Friend request actions
+function acceptFriend(phone){
+  if(!currentUser){toast('请先登录');return;}
+  fetch(API_BASE+'/api/friend/accept',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已接受');render();}else toast(d.error||'操作失败');});
+}
+function rejectFriend(phone){
+  if(!currentUser){toast('请先登录');return;}
+  fetch(API_BASE+'/api/friend/reject',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已拒绝');render();}else toast(d.error||'操作失败');});
+}
+
   d.onclick = function(e) { if(e.target===d) d.remove(); };
 };
+
 
