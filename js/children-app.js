@@ -1,5 +1,5 @@
-// ========== 配置 ==========
-const API_BASE = 'http://localhost:3000';
+﻿// ========== 配置 ==========
+const API_BASE = '';
 let currentUser = null;
 
 // ========== 本地存储 ==========
