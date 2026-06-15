@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f08a24"/>
+      <stop offset="100%" style="stop-color:#3faa5a"/>
+    </linearGradient>
+  </defs>
+  <!-- White circle background -->
+  <circle cx="100" cy="100" r="95" fill="white" stroke="#eee" stroke-width="1"/>
+  <!-- "颐" character with gradient -->
+  <text x="100" y="125" text-anchor="middle" font-size="110" font-weight="bold" font-family="KaiTi,STKaiti,serif" fill="url(#grad)" dominant-baseline="central">\u9890</text>
+  <!-- Small leaf decoration on top -->
+  <!-- Left leaf -->
+  <path d="M88 12 Q80 8 76 14 Q82 16 86 18 Q84 10 88 12Z" fill="#3faa5a" opacity="0.8"/>
+  <!-- Right leaf -->
+  <path d="M112 12 Q120 8 124 14 Q118 16 114 18 Q116 10 112 12Z" fill="#f08a24" opacity="0.8"/>
+  <!-- Stem -->
+  <line x1="100" y1="8" x2="100" y2="16" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Elderly silhouettes inside the character area -->
+  <!-- Female figure (left, doing tai chi) -->
+  <g transform="translate(65, 135)" fill="#3faa5a" opacity="0.5">
+    <circle cx="0" cy="-25" r="8"/>
+    <line x1="0" y1="-17" x2="-5" y2="5" stroke="#3faa5a" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-5" y1="5" x2="-12" y2="8" stroke="#3faa5a" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="-17" x2="6" y2="0" stroke="#3faa5a" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="6" y1="0" x2="12" y2="5" stroke="#3faa5a" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-5" y1="5" x2="-3" y2="20" stroke="#3faa5a" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="6" y1="0" x2="8" y2="18" stroke="#3faa5a" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <!-- Male figure (right, walking) -->
+  <g transform="translate(130, 140)" fill="#f08a24" opacity="0.5">
+    <circle cx="0" cy="-25" r="8"/>
+    <line x1="0" y1="-17" x2="-3" y2="3" stroke="#f08a24" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-3" y1="3" x2="-10" y2="0" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="0" y1="-17" x2="5" y2="-2" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="5" y1="-2" x2="10" y2="5" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-3" y1="3" x2="-5" y2="18" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="5" y1="-2" x2="7" y2="15" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+</svg>
