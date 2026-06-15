@@ -401,6 +401,26 @@ app.post('/api/admin/service/update', adminAuth, async (req, res) => {
 });
 app.post('/api/admin/service/delete', adminAuth, async (req, res) => { try { const { id } = req.body; if (!id) return res.status(400).json({ error: "缺少服务ID" }); await servicesCollection.deleteOne({ id: id }); res.json({ ok: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
 app.get('/api/services', async (req, res) => { try { const s = await servicesCollection.find({ active: { $ne: false } }).toArray(); res.json({ data: s }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.post('/api/service/purchase-for-elderly', auth, async (req, res) => {
+  try {
+    const { serviceId, elderlyPhone } = req.body;
+    if (!serviceId) return res.status(400).json({ error: '缺少服务ID' });
+    if (!elderlyPhone) return res.status(400).json({ error: '缺少老人手机号' });
+    const service = await servicesCollection.findOne({ id: serviceId });
+    if (!service) return res.status(404).json({ error: '服务不存在' });
+    if (service.active === false) return res.status(400).json({ error: '服务已下架' });
+    if (service.enrolled >= service.maxParticipants) return res.status(400).json({ error: '参与人数已满' });
+    const user = await usersCollection.findOne({ phone: req.phone });
+    if (!user) return res.status(401).json({ error: '用户不存在' });
+    const userCoins = (user.coins || 0);
+    if (userCoins < service.price) return res.status(400).json({ error: '健康币不足，请先充值' });
+    await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -service.price }, $push: { elderlyPurchases: { elderlyPhone, serviceName: service.name, serviceId, time: new Date().toISOString() } }, $set: { updatedAt: new Date() } });
+    await servicesCollection.updateOne({ id: serviceId }, { $inc: { enrolled: 1 } });
+    await usersCollection.updateOne({ phone: elderlyPhone }, { $push: { purchasedServices: serviceId }, $set: { updatedAt: new Date() } });
+    res.json({ ok: true, message: '购买成功', coinsLeft: (userCoins - service.price) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/service/purchase', auth, async (req, res) => {
   try { const { serviceId } = req.body; if (!serviceId) return res.status(400).json({ error: "缺少服务ID" }); const service = await servicesCollection.findOne({ id: serviceId }); if (!service) return res.status(404).json({ error: "服务不存在" }); if (service.active === false) return res.status(400).json({ error: "服务已下架" }); if (service.enrolled >= service.maxParticipants) return res.status(400).json({ error: "参与人数已满" }); const user = await usersCollection.findOne({ phone: req.phone }); if (!user) return res.status(401).json({ error: "用户不存在" }); if (user.purchasedServices && user.purchasedServices.includes(serviceId)) return res.json({ ok: true, message: "已购买过该服务" }); const userCoins = (user.coins || 0); if (userCoins < service.price) return res.status(400).json({ error: "健康币不足，请先充值" }); await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -service.price }, $push: { purchasedServices: serviceId }, $set: { updatedAt: new Date() } }); await servicesCollection.updateOne({ id: serviceId }, { $inc: { enrolled: 1 } }); res.json({ ok: true, message: "购买成功", coinsLeft: (userCoins - service.price) }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
