@@ -1660,10 +1660,16 @@ PAGES.services = (app) => {
 };
 
 window.purchaseService = async function(id) {
+  var elderlyPhone = '';
+  var selEl = document.getElementById('elderly-phone-select');
+  if(selEl && selEl.value) elderlyPhone = selEl.value;
+  var inpEl = document.getElementById('elderly-phone-input');
+  if(inpEl && inpEl.value.trim() && !elderlyPhone) elderlyPhone = inpEl.value.trim();
   if(!currentUser){toast("请先登录");return;}
-  var res = await fetch(API_BASE+"/api/service/purchase",{
+  var url = elderlyPhone ? API_BASE+'/api/service/purchase-for-elderly' : API_BASE+'/api/service/purchase';
+  var res = await fetch(url,{
     method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+currentUser.token},
-    body:JSON.stringify({serviceId:id})
+    body:JSON.stringify({serviceId:id, elderlyPhone:elderlyPhone})
   });
   var data = await res.json();
   if(data.ok){toast("购买成功 \u2705");navigate("services");}else{toast(data.error||"购买失败");}
