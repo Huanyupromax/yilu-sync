@@ -1583,7 +1583,7 @@ PAGES.me = (app) => {
 // ── 付费服务页面 ──
 PAGES.services = (app) => {
   setNavTitle("付费服务");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div><div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div><div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div><div class="card"><div class="card-title">为老人购买课程</div><div style="display:flex;gap:8px;margin-bottom:6px;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="flex:1;" /><button class="btn btn-primary" id="load-courses-btn" style="padding:6px 12px;">查询课程</button></div><div id="quick-elderly-contacts"></div><div id="courses-for-elderly"><div class="text-muted" style="text-align:center;padding:8px;">输入老人手机号后点击查询</div></div></div></div>';
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div><div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div><div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div><div class="card"><div class="card-title">为老人购买课程</div><div style="display:flex;gap:8px;margin-bottom:6px;"><select id="elderly-phone-select" class="form-input" style="flex:1;"><option value="">选择老人...</option></select><input id="elderly-phone-input" class="form-input" placeholder="或直接输入手机号" style="flex:1;margin-top:4px;" /><button class="btn btn-primary" id="load-courses-btn" style="padding:6px 12px;">查询课程</button></div><div id="quick-elderly-contacts"></div><div id="courses-for-elderly"><div class="text-muted" style="text-align:center;padding:8px;">输入老人手机号后点击查询</div></div></div></div>';
   // Load coin balance from server
   if(currentUser){
     fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
@@ -1619,6 +1619,32 @@ PAGES.services = (app) => {
     if(lcb) lcb.onclick = loadCoursesForChildren;
     var epi = document.getElementById('elderly-phone-input');
     if(epi) epi.onkeypress = function(e) { if(e.key==='Enter' && document.getElementById('load-courses-btn')) document.getElementById('load-courses-btn').click(); };
+    // 快速选择长辈联系人
+    // 填充下拉框
+    var sel = document.getElementById('elderly-phone-select');
+    var inp = document.getElementById('elderly-phone-input');
+    if(sel){
+        var ecs = storage.getContacts().filter(function(c){ return c.phone && (c.relation === '\u957f\u8f88' || c.relation === '\u7236\u6bcd'); });
+        ecs.forEach(function(c){
+            var opt = document.createElement('option');
+            opt.value = c.phone;
+            opt.textContent = c.name + ' (' + c.phone + ')';
+            sel.appendChild(opt);
+        });
+        sel.onchange = function(){
+            if(sel.value && inp){
+                inp.value = sel.value;
+                // Trigger course search
+                var lcb = document.getElementById('load-courses-btn');
+                if(lcb) lcb.click();
+                // Also refresh service list if needed
+            } else if(inp) {
+                inp.value = '';
+            }
+        };
+        // Show input when 'other' is needed - always show input for manual entry
+        if(inp) inp.style.display = 'block';
+    }
     // 快速选择长辈联系人
     (function(){
         var el = document.getElementById('quick-elderly-contacts');
@@ -1656,6 +1682,10 @@ async function loadCoursesForChildren() {
       headers: { Authorization: 'Bearer ' + currentUser.token }
     });
     var userData = await userRes.json();
+    // Show who we're buying for
+    var selName = '';
+    var selEl = document.getElementById('elderly-phone-select');
+    if(selEl && selEl.selectedIndex > 0) selName = selEl.options[selEl.selectedIndex].text;
     if(!userRes.ok || !userData.user) {
       container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;color:var(--red);">\u672a\u627e\u5230\u8be5\u7528\u6237</div>';
       return;
