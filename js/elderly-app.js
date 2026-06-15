@@ -453,7 +453,7 @@ PAGES['data-entry'] = (app) => {
     app.querySelectorAll('input[type="range"]').forEach(el => {
         el.oninput = () => { form[el.dataset.f] = el.value; var sp = app.querySelector('[data-v="' + el.dataset.f + '"]'); if(sp) sp.textContent = el.value; };
     });
-    app.querySelector('#save-btn').onclick = () => { storage.saveDailyRecord(today, form); toast('已保存'); navigate('data'); };
+    app.querySelector('#save-btn').onclick = () => { storage.saveDailyRecord(today, form); lsSet(KEYS.HEALTH_DATA,{heartRate:form.heartRate,bloodPressure:form.bp,steps:form.steps,sleepHours:form.sleep}); toast('已保存'); navigate('data'); };
 };
 
 PAGES['data-summary'] = (app) => {
