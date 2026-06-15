@@ -437,21 +437,56 @@ PAGES['data-entry'] = (app) => {
     setNavTitle('录入当日数据');
     const today = new Date().toISOString().slice(0,10);
     const existed = storage.getDailyRecord(today) || {};
-    let form = { bp: existed.bp || '', heartRate: existed.heartRate || '', steps: existed.steps || '', sleep: existed.sleep || '' };
-    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">${today}</div>
-        <div class="form-row"><div class="form-label">血压</div><input class="form-input" data-f="bp" value="${escapeHtml(form.bp)}" /></div>
-        <div class="form-row"><div class="form-label">心率</div><input class="form-input" data-f="heartRate" value="${escapeHtml(form.heartRate)}" /></div>
-        <div class="form-row"><div class="form-label">步数</div><input class="form-input" data-f="steps" value="${escapeHtml(form.steps)}" /></div>
-        <div class="form-row"><div class="form-label">睡眠时长</div><input class="form-input" data-f="sleep" value="${escapeHtml(form.sleep)}" /></div>
-        </div><button class="btn btn-primary btn-block" id="save-btn">保存</button></div>`;
-    app.querySelectorAll('[data-f]').forEach(el => el.oninput = () => form[el.dataset.f] = el.value);
+    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', steps: existed.steps || '5000', sleep: existed.sleep || '7' };
+    const fields = [
+        { key: 'bp', label: '血压', min: 60, max: 220, unit: 'mmHg', step: 1 },
+        { key: 'heartRate', label: '心率', min: 30, max: 220, unit: '次/分', step: 1 },
+        { key: 'steps', label: '步数', min: 0, max: 50000, unit: '步', step: 100 },
+        { key: 'sleep', label: '睡眠时长', min: 0, max: 24, unit: '小时', step: 0.5 }
+    ];
+    let html = '<div class="container"><div class="card"><div class="card-title">' + today + '</div>';
+    fields.forEach(f => {
+        html += '<div class="form-row" style="flex-wrap:wrap;"><div class="form-label" style="width:100%;margin-bottom:4px;">' + f.label + '</div><input type="range" data-f="' + f.key + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + form[f.key] + '" style="flex:1;"><span class="range-val" data-v="' + f.key + '" style="min-width:50px;text-align:right;font-weight:600;">' + form[f.key] + '</span><span style="width:40px;text-align:right;color:var(--gray);font-size:13px;">' + f.unit + '</span></div>';
+    });
+    html += '</div><button class="btn btn-primary btn-block" id="save-btn">保存</button></div>';
+    app.innerHTML = html;
+    app.querySelectorAll('input[type="range"]').forEach(el => {
+        el.oninput = () => { form[el.dataset.f] = el.value; var sp = app.querySelector('[data-v="' + el.dataset.f + '"]'); if(sp) sp.textContent = el.value; };
+    });
     app.querySelector('#save-btn').onclick = () => { storage.saveDailyRecord(today, form); toast('已保存'); navigate('data'); };
 };
 
 PAGES['data-summary'] = (app) => {
     setNavTitle('数据总结');
-    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">近7天平均</div><div class="text-muted">暂无数据，请先录入</div></div><button class="btn btn-ghost btn-block" data-go="data-entry">去录入</button></div>`;
-    app.querySelector('[data-go]').onclick = () => navigate('data-entry');
+    var allR = storage.getDailyRecords();
+    var dates = Object.keys(allR).sort();
+    var recent7 = dates.slice(-7);
+    if (recent7.length === 0) {
+        app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div><div class="text-muted" style="text-align:center;padding:40px;">暂无数据，请先录入</div></div><button class="btn btn-ghost btn-block" data-go="data-entry">去录入</button></div>';
+        app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
+        return;
+    }
+    var bpS=0,hrS=0,stS=0,slS=0, bpN=0,hrN=0,stN=0,slN=0;
+    recent7.forEach(function(d){
+        var r = allR[d];
+        if(r.bp && !isNaN(r.bp)){bpS+=+r.bp;bpN++;}
+        if(r.heartRate && !isNaN(r.heartRate)){hrS+=+r.heartRate;hrN++;}
+        if(r.steps && !isNaN(r.steps)){stS+=+r.steps;stN++;}
+        if(r.sleep && !isNaN(r.sleep)){slS+=+r.sleep;slN++;}
+    });
+    var avg = function(s,n){return n?(s/n).toFixed(1):'--';};
+    var rows = [
+        ['血压', avg(bpS,bpN), 'mmHg'],
+        ['心率', avg(hrS,hrN), '次/分'],
+        ['步数', avg(stS,stN), '步'],
+        ['睡眠时长', avg(slS,slN), '小时']
+    ];
+    var listHtml = '';
+    rows.forEach(function(r){listHtml += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;"><span>'+r[0]+'</span><span style="font-weight:600;color:var(--orange);">'+r[1]+' '+r[2]+'</span></div>';});
+    var dayHtml = '';
+    recent7.slice().reverse().forEach(function(d){var r=allR[d];dayHtml += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>'+d.slice(5)+'</span><span style="font-size:13px;color:var(--gray);">'+(r.bp||'--')+'/'+(r.heartRate||'--')+'/'+(r.steps||'--')+'/'+(r.sleep||'--')+'</span></div>';});
+    app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div>'+listHtml+'<div class="text-muted" style="font-size:12px;margin-top:4px;">基于最近 '+recent7.length+' 天的数据</div></div><div class="card"><div class="card-title">每日记录</div>'+dayHtml+'</div><button class="btn btn-ghost btn-block" data-go="data-entry">录入新数据</button></div>';
+    app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
 };
 
 // 单聊相关
@@ -560,6 +595,17 @@ PAGES.chat = (app, params) => {
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
+    const overlayTip = overlay.querySelector('.voice-tip');
+    const moveHandler = (e) => {
+        const y = e.clientY || e.touches?.[0]?.clientY;
+        if (startY - y > 30) {
+            overlay.classList.add('cancel');
+            overlayTip.textContent = '松手取消';
+        } else {
+            overlay.classList.remove('cancel');
+            overlayTip.textContent = '松开发送 · 上滑取消';
+        }
+    };
     voiceBtn.addEventListener('mousedown', startRecord);
     voiceBtn.addEventListener('mouseup', stopRecord);
     voiceBtn.addEventListener('mouseleave', () => { if (mediaRecorder && mediaRecorder.state === 'recording') cancelRecord(); });
@@ -573,6 +619,8 @@ PAGES.chat = (app, params) => {
             audioChunks = [];
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
             overlay.classList.add('show');
+            document.addEventListener('mousemove', moveHandler);
+            document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
         }).catch(err => toast('无法录音，请检查麦克风权限'));
     }
@@ -604,6 +652,8 @@ PAGES.chat = (app, params) => {
         };
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('touchmove', moveHandler);
         overlay.classList.remove('show');
         voiceBtn.classList.remove('recording');
         mediaRecorder = null;
@@ -613,6 +663,8 @@ PAGES.chat = (app, params) => {
             mediaRecorder.onstop = () => {};
             mediaRecorder.stop();
             mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('touchmove', moveHandler);
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
@@ -761,6 +813,17 @@ PAGES['group-chat'] = async (app, params) => {
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
+    const overlayTip = overlay.querySelector('.voice-tip');
+    const moveHandler = (e) => {
+        const y = e.clientY || e.touches?.[0]?.clientY;
+        if (startY - y > 30) {
+            overlay.classList.add('cancel');
+            overlayTip.textContent = '松手取消';
+        } else {
+            overlay.classList.remove('cancel');
+            overlayTip.textContent = '松开发送 · 上滑取消';
+        }
+    };
     voiceBtn.addEventListener('mousedown', startRecord);
     voiceBtn.addEventListener('mouseup', stopRecord);
     voiceBtn.addEventListener('mouseleave', () => { if (mediaRecorder && mediaRecorder.state === 'recording') cancelRecord(); });
@@ -774,6 +837,8 @@ PAGES['group-chat'] = async (app, params) => {
             audioChunks = [];
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
             overlay.classList.add('show');
+            document.addEventListener('mousemove', moveHandler);
+            document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
         }).catch(err => toast('无法录音'));
     }
@@ -806,6 +871,8 @@ PAGES['group-chat'] = async (app, params) => {
         };
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('touchmove', moveHandler);
         overlay.classList.remove('show');
         voiceBtn.classList.remove('recording');
         mediaRecorder = null;
@@ -815,6 +882,8 @@ PAGES['group-chat'] = async (app, params) => {
             mediaRecorder.onstop = () => {};
             mediaRecorder.stop();
             mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('touchmove', moveHandler);
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
@@ -888,6 +957,17 @@ PAGES.assistant = (app) => {
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
+    const overlayTip = overlay.querySelector('.voice-tip');
+    const moveHandler = (e) => {
+        const y = e.clientY || e.touches?.[0]?.clientY;
+        if (startY - y > 30) {
+            overlay.classList.add('cancel');
+            overlayTip.textContent = '松手取消';
+        } else {
+            overlay.classList.remove('cancel');
+            overlayTip.textContent = '松开发送 · 上滑取消';
+        }
+    };
     voiceBtn.addEventListener('mousedown', startRecord);
     voiceBtn.addEventListener('mouseup', stopRecord);
     voiceBtn.addEventListener('mouseleave', () => { if (mediaRecorder && mediaRecorder.state === 'recording') cancelRecord(); });
@@ -901,6 +981,8 @@ PAGES.assistant = (app) => {
             audioChunks = [];
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
             overlay.classList.add('show');
+            document.addEventListener('mousemove', moveHandler);
+            document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
         }).catch(err => toast('无法录音'));
     }
@@ -914,6 +996,8 @@ PAGES.assistant = (app) => {
         };
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('touchmove', moveHandler);
         overlay.classList.remove('show');
         voiceBtn.classList.remove('recording');
         mediaRecorder = null;
@@ -923,6 +1007,8 @@ PAGES.assistant = (app) => {
             mediaRecorder.onstop = () => {};
             mediaRecorder.stop();
             mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('touchmove', moveHandler);
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
@@ -1301,7 +1387,8 @@ PAGES['ai-chat'] = (app) => {
       '</div>' +
         '</div>' +
         '<div class="card"><div class="card-title">慢性病史</div>' +
-        '<div class="check-row" id="ai-chronic-row"><div class="check-box" id="ai-chronic-box"></div><span>有基础病或慢性病史</span></div></div>' +
+        '<div class="check-row" id="ai-chronic-row"><div class="check-box" id="ai-chronic-box"></div><span>有基础病或慢性病史</span></div></div' +
+        '<div class="card"><div class="card-title">健康建议</div><div id="advice-content" style="margin-top:8px;"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">填写数据后点击下方按钮获取建议</div></div></div>' +
         '<button class="btn btn-primary btn-block" id="submit-advice-btn">💡 获取建议</button>' +
         '<button class="btn btn-ghost btn-block" id="back-to-main-btn" style="margin-top:8px;">← 返回</button></div>';
       
@@ -1372,7 +1459,7 @@ PAGES.me = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">我的</div><div class="header-subtitle">个人中心</div></div></div>
             <div class="card"><div class="row"><div class="avatar orange" style="width:65px;height:65px;font-size:35px;">\uD83D\uDC68</div><div><div class="fs-40 fw-600">${escapeHtml(p.name || '张三')}${(currentUser&&currentUser.role?'<span class="tag orange">' + escapeHtml(currentUser.role) + '</span>':'')}${p.hasChronic ? '<span class="tag">慢性病</span>' : ''}<span class="tag orange">VIP</span></div></div><button class="btn btn-ghost" data-go="profile-setup">编辑</button></div><div class="row mt-20"><div class="info-pill green"><div class="fs-36 fw-600">${p.height || '178'} cm</div><div>身高</div></div><div class="info-pill orange"><div class="fs-36 fw-600">${p.weight || '66'} kg</div><div>体重</div></div></div></div>
             <div class="card"><div class="card-title">账号</div><div class="form-row" data-go="profile-setup"><span>\uD83D\uDC68\u200D</span><div style="flex:1">个人资料</div><span>\u203A</span></div><div class="form-row" data-go="monitor"><span>\uD83D\uDCF3</span><div style="flex:1">我的数据</div><span>\u203A</span></div><div class="form-row" data-go="coin"><span>\uD83E\uDE99</span><div style="flex:1">健康币</div><span>${storage.signStreak()+2} 枚 \u203A</span></div><div class="form-row" data-go="services"><span>\uD83D\uDCB3</span><div style="flex:1">付费服务</div><span>\u203A</span></div><div class="form-row" data-go="myrx"><span>\uD83D\uDCCB</span><div style="flex:1">我的处方</div><span>\u203A</span></div><div class="form-row" data-go="account"><span>\uD83D\uDD10</span><div style="flex:1">账号管理</div><span>\u203A</span></div></div>
-            <div class="card"><div class="card-title">更多</div><div class="form-row"><span>\uD83D\uDCDA</span><div style="flex:1">课程与计划</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFC6</span><div style="flex:1">成就</div><span>\u203A</span></div><div class="form-row" data-go="settings"><span>\u2699\uFE0F</span><div style="flex:1">设置</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDCAC</span><div style="flex:1">用户反馈</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFDE\uFE0F</span><div style="flex:1">联系客服</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDEE1\uFE0F</span><div style="flex:1">隐私政策</div><span>\u203A</span></div></div>
+            <div class="card"><div class="card-title">更多</div><div class="form-row"><span>\uD83D\uDCDA</span><div style="flex:1">课程与计划</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFC6</span><div style="flex:1">成就</div><span>\u203A</span></div><div class="form-row" data-go="settings"><span>\u2699\uFE0F</span><div style="flex:1">设置</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDCAC</span><div style="flex:1">用户反馈</div><span>\u203A</span></div><div class="form-row" onclick="window.customerService()"><span>\uD83C\uDFDE\uFE0F</span><div style="flex:1">联系客服</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDEE1\uFE0F</span><div style="flex:1">隐私政策</div><span>\u203A</span></div></div>
             <div class="card"><div class="form-row" id="logout-btn" style="border-bottom:none;justify-content:center;"><span>\uD83D\uDEAA</span><div style="flex:1;text-align:center;color:var(--red);font-size:16px;">退出登录</div><span></span></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
@@ -1668,3 +1755,18 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// 联系客服
+window.customerService = function() {
+  var d = document.createElement("div");
+  d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;";
+  d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:30px 24px;width:85%;max-width:300px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.2);">' +
+    '<div style="font-size:48px;margin-bottom:12px;">📧</div>' +
+    '<div style="font-size:17px;font-weight:600;margin-bottom:12px;">联系客服</div>' +
+    '<div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:20px;">返回微信公众号，您可以直接发消息给客服</div>' +
+    '<button onclick="this.parentNode.parentNode.remove()" style="background:#ff6b35;color:#fff;border:none;padding:10px 40px;border-radius:24px;font-size:16px;cursor:pointer;">我知道了</button>' +
+  '</div>';
+  document.body.appendChild(d);
+  d.onclick = function(e) { if(e.target===d) d.remove(); };
+};
+
