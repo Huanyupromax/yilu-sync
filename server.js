@@ -78,6 +78,10 @@ async function auth(req, res, next) {
 }
 
 // -------------------- 用户相关 --------------------
+// 健康检查（Railway 需要）
+app.get('/', (req, res) => { res.json({ status: 'ok', serverReady: serverReady }); });
+app.get('/health', (req, res) => { res.json({ status: 'ok', serverReady: serverReady }); });
+
 app.post('/api/register', waitDB, async (req, res) => {
     try {
         const { phone, password, role } = req.body;
