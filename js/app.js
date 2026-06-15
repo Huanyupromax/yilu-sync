@@ -495,12 +495,14 @@ PAGES['data-entry'] = (app) => {
     setNavTitle('录入当日数据');
     const today = new Date().toISOString().slice(0,10);
     const existed = storage.getDailyRecord(today) || {};
-    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', steps: existed.steps || '5000', sleep: existed.sleep || '7' };
+    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', steps: existed.steps || '5000', sleep: existed.sleep || '7', bloodOxygen: existed.bloodOxygen || '97', bloodSugar: existed.bloodSugar || '5.5' };
     const fields = [
         { key: 'bp', label: '血压', min: 60, max: 220, unit: 'mmHg', step: 1 },
         { key: 'heartRate', label: '心率', min: 30, max: 220, unit: '次/分', step: 1 },
         { key: 'steps', label: '步数', min: 0, max: 50000, unit: '步', step: 100 },
-        { key: 'sleep', label: '睡眠时长', min: 0, max: 24, unit: '小时', step: 0.5 }
+        { key: 'sleep', label: '睡眠时长', min: 0, max: 24, unit: '小时', step: 0.5 },
+        { key: 'bloodOxygen', label: '血氧', min: 60, max: 100, unit: '%', step: 1 },
+        { key: 'bloodSugar', label: '血糖', min: 2, max: 30, unit: 'mmol/L', step: 0.1 }
     ];
     let html = '<div class="container"><div class="card"><div class="card-title">' + today + '</div>';
     fields.forEach(f => {
@@ -511,7 +513,7 @@ PAGES['data-entry'] = (app) => {
     app.querySelectorAll('input[type="range"]').forEach(el => {
         el.oninput = () => { form[el.dataset.f] = el.value; var sp = app.querySelector('[data-v="' + el.dataset.f + '"]'); if(sp) sp.textContent = el.value; };
     });
-    app.querySelector('#save-btn').onclick = () => { lsSet(KEYS.HEALTH_DATA,{heartRate:form.heartRate,bloodPressure:form.bp,steps:form.steps,sleepHours:form.sleep}) storage.saveDailyRecord(today, form);  toast('已保存'); navigate('data'); };
+    app.querySelector('#save-btn').onclick = () => { lsSet(KEYS.HEALTH_DATA,{heartRate:form.heartRate,bloodPressure:form.bp,steps:form.steps,sleepHours:form.sleep,bloodOxygen:form.bloodOxygen,bloodSugar:form.bloodSugar}) storage.saveDailyRecord(today, form);  toast('已保存'); navigate('data'); };
 };
 
 PAGES['data-summary'] = (app) => {
