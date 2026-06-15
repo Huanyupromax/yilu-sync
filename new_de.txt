@@ -1,0 +1,56 @@
+﻿    setNavTitle('录入当日数据');
+    const today = new Date().toISOString().slice(0,10);
+    const existed = storage.getDailyRecord(today) || {};
+    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', bloodOxygen: existed.bloodOxygen || '97', bloodSugar: existed.bloodSugar || '5.5', steps: existed.steps || '5000', sleep: existed.sleep || '7' };
+    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">${today}</div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">血压</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="bp" min="60" max="220" value="${form.bp||120}" style="flex:1;">
+            <span class="range-val" data-f="bp">${form.bp||120}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">mmHg</span>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">心率</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="heartRate" min="30" max="220" value="${form.heartRate||72}" style="flex:1;">
+            <span class="range-val" data-f="heartRate">${form.heartRate||72}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">次/分</span>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">血氧</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="bloodOxygen" min="60" max="100" value="${form.bloodOxygen||97}" style="flex:1;">
+            <span class="range-val" data-f="bloodOxygen">${form.bloodOxygen||97}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">%</span>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">血糖</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="bloodSugar" min="1" max="30" step="0.1" value="${form.bloodSugar||5.5}" style="flex:1;">
+            <span class="range-val" data-f="bloodSugar">${form.bloodSugar||5.5}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">mmol/L</span>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">步数</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="steps" min="0" max="50000" value="${form.steps||5000}" style="flex:1;">
+            <span class="range-val" data-f="steps">${form.steps||5000}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">步</span>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px;">睡眠时长</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" class="form-input" data-f="sleep" min="0" max="24" step="0.5" value="${form.sleep||7}" style="flex:1;">
+            <span class="range-val" data-f="sleep">${form.sleep||7}</span>
+            <span style="font-size:11px;color:var(--gray);white-space:nowrap;">小时</span>
+          </div>
+        </div>
+        </div><button class="btn btn-primary btn-block" id="save-btn">保存</button></div>`;
+    app.querySelectorAll('[data-f]').forEach(el => { el.oninput = function() { form[this.dataset.f] = this.value; var v = this.parentElement.querySelector('.range-val'); if (v) v.textContent = this.value; }; });
+    app.querySelector('#save-btn').onclick = () => { storage.saveDailyRecord(today, form); toast('已保存'); navigate('data'); };
