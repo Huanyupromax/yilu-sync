@@ -50,11 +50,12 @@ async function connectDB() {
     await groupMessagesCollection.createIndex({ groupId: 1, timestamp: -1 });
     console.log('✅ MongoDB 连接成功');
 }
-connectDB().catch(console.error);
 
-// 中间件：等待数据库就绪
 let serverReady = false;
-connectDB().then(() => { serverReady = true; });
+connectDB()
+  .then(() => { serverReady = true; })
+  .catch(err => { console.error('❌ MongoDB连接失败:', err.message); });
+
 function waitDB(req, res, next) {
     if (serverReady) return next();
     res.status(503).json({ error: '服务初始化中' });
