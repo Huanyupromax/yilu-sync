@@ -1,0 +1,810 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { MongoClient, ObjectId } = require('mongodb');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// 配置文件上传
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = './uploads/';
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'voice-' + unique + (ext || '.wav'));
+    }
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+
+// MongoDB 连接
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const client = new MongoClient(MONGO_URI);
+let db;
+let usersCollection;
+let groupsCollection;
+let groupMessagesCollection;
+
+async function connectDB() {
+    await client.connect();
+    db = client.db('yilu');
+    usersCollection = db.collection('users');
+    groupsCollection = db.collection('groups');
+    groupMessagesCollection = db.collection('group_messages');
+    servicesCollection = db.collection('services');
+    coursesCollection = db.collection('courses');
+    friendsCollection = db.collection('friends');
+    messagesCollection = db.collection('messages');
+    await usersCollection.createIndex({ phone: 1 }, { unique: true });
+    await groupsCollection.createIndex({ members: 1 });
+    await groupMessagesCollection.createIndex({ groupId: 1, timestamp: -1 });
+    console.log('✅ MongoDB 连接成功');
+}
+connectDB().catch(console.error);
+
+// 中间件：等待数据库就绪
+let serverReady = false;
+connectDB().then(() => { serverReady = true; });
+function waitDB(req, res, next) {
+    if (serverReady) return next();
+    res.status(503).json({ error: '服务初始化中' });
+}
+
+// 认证中间件
+// JWT密钥
+const JWT_SECRET = process.env.JWT_SECRET || 'yilu-secret-key-2024';
+
+async function auth(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: '未授权' });
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.phone = decoded.phone;
+        next();
+    } catch {
+        res.status(401).json({ error: 'token无效' });
+    }
+}
+
+// -------------------- 用户相关 --------------------
+app.post('/api/register', waitDB, async (req, res) => {
+    try {
+        const { phone, password, role } = req.body;
+        if (!phone || !password) return res.status(400).json({ error: '手机号和密码不能为空' });
+        const exist = await usersCollection.findOne({ phone });
+        if (exist) { var existingRole = {"银龄用户":"老年端","普通用户":"老年端","子女群体":"子女端","医生与营养师":"营养师端","健康师":"营养师端","营养师":"营养师端","医师":"营养师端"}[exist.role] || exist.role || "其他"; return res.status(400).json({ error: "此手机号已注册为"+existingRole+"用户，如需更换请先注销账户" }); }
+        const hash = await bcrypt.hash(password, 10);
+        const newUser = { phone, password: hash, role: role || '银龄用户', data: {}, updatedAt: new Date() };
+        await usersCollection.insertOne(newUser);
+        const token = jwt.sign({ phone }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, user: { phone, role: role || '银龄用户' } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/login', waitDB, async (req, res) => {
+    try {
+        const { phone, password, role } = req.body;
+        const user = await usersCollection.findOne({ phone });
+        if (!user) return res.status(401).json({ error: '用户不存在' });
+        const ok = await bcrypt.compare(password, user.password);
+        if (!ok) return res.status(401).json({ error: '密码错误' });
+        const token = jwt.sign({ phone }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token, user: { phone, role: user.role || '银龄用户' } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/sync', waitDB, auth, async (req, res) => {
+    try {
+        const { allData } = req.body;
+        await usersCollection.updateOne(
+            { phone: req.phone },
+            { $set: { data: allData, updatedAt: new Date() } }
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/sync', waitDB, auth, async (req, res) => {
+    try {
+        const user = await usersCollection.findOne({ phone: req.phone });
+        res.json(user?.data || {});
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// -------------------- 群聊 --------------------
+// 创建群聊
+app.post('/api/group/create', waitDB, auth, async (req, res) => {
+    try {
+        const { name, avatar, members } = req.body; // members 是手机号数组，包含创建者自己
+        const allMembers = [...new Set([req.phone, ...(members || [])])];
+        const group = {
+            name: name || '新群聊',
+            avatar: avatar || '👥',
+            owner: req.phone,
+            members: allMembers,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        const result = await groupsCollection.insertOne(group);
+        res.json({ groupId: result.insertedId, group });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 获取我的群聊列表
+app.get('/api/groups', waitDB, auth, async (req, res) => {
+    try {
+        const groups = await groupsCollection.find({ members: req.phone }).toArray();
+        // 获取每个群的最新一条消息（用于显示预览）
+        const groupsWithLastMsg = await Promise.all(groups.map(async (g) => {
+            const lastMsg = await groupMessagesCollection.findOne(
+                { groupId: g._id },
+                { sort: { timestamp: -1 } }
+            );
+            return { ...g, lastMessage: lastMsg?.text || '', lastTime: lastMsg?.timestamp || g.createdAt };
+        }));
+        res.json(groupsWithLastMsg);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 发送群消息
+app.post('/api/group/message', waitDB, auth, async (req, res) => {
+    try {
+        const { groupId, text, voiceUrl } = req.body; // voiceUrl 可选，由前端上传语音后得到
+        if (!groupId) return res.status(400).json({ error: '缺少群组ID' });
+        const group = await groupsCollection.findOne({ _id: new ObjectId(groupId) });
+        if (!group || !group.members.includes(req.phone)) {
+            return res.status(403).json({ error: '你不是群成员' });
+        }
+        const msg = {
+            groupId: new ObjectId(groupId),
+            from: req.phone,
+            text: text || '',
+            voiceUrl: voiceUrl || null,
+            timestamp: new Date(),
+            readBy: [req.phone]
+        };
+        const result = await groupMessagesCollection.insertOne(msg);
+        res.json({ ok: true, msgId: result.insertedId });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 获取群消息历史
+app.get('/api/group/messages', waitDB, auth, async (req, res) => {
+    try {
+        const { groupId, limit = 50, before } = req.query;
+        if (!groupId) return res.status(400).json({ error: '缺少群组ID' });
+        const group = await groupsCollection.findOne({ _id: new ObjectId(groupId) });
+        if (!group || !group.members.includes(req.phone)) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const query = { groupId: new ObjectId(groupId) };
+        if (before) {
+            query.timestamp = { $lt: new Date(before) };
+        }
+        const messages = await groupMessagesCollection.find(query)
+            .sort({ timestamp: -1 })
+            .limit(parseInt(limit))
+            .toArray();
+        res.json(messages.reverse()); // 按时间正序
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 添加群成员
+app.post('/api/group/addMember', waitDB, auth, async (req, res) => {
+    try {
+        const { groupId, phone } = req.body;
+        if (!groupId || !phone) return res.status(400).json({ error: '参数不足' });
+        const group = await groupsCollection.findOne({ _id: new ObjectId(groupId) });
+        if (!group) return res.status(404).json({ error: '群聊不存在' });
+        if (group.owner !== req.phone && !group.members.includes(req.phone)) {
+            return res.status(403).json({ error: '无权限添加成员' });
+        }
+        if (group.members.includes(phone)) return res.json({ ok: true, message: '已在群中' });
+        await groupsCollection.updateOne(
+            { _id: new ObjectId(groupId) },
+            { $push: { members: phone }, $set: { updatedAt: new Date() } }
+        );
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// -------------------- 语音消息上传 --------------------
+app.post('/api/upload/voice', waitDB, auth, upload.single('voice'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: '没有文件' });
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        res.json({ url: fileUrl, filename: req.file.filename });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 静态文件服务（用于访问上传的语音）
+app.use('/uploads', express.static('uploads'));
+
+app.use(express.static(__dirname));
+
+
+// DeepSeek API nutrition advisor
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+
+async function callDeepSeek(messages) {
+  if (!DEEPSEEK_API_KEY) {
+    const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.ZHIPU_API_KEY },
+      body: JSON.stringify({ model: 'glm-4-flash', messages: messages, stream: false })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error('Zhipu AI error: ' + response.status + ' ' + errText);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+  try {
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY },
+      body: JSON.stringify({ model: 'deepseek-chat', messages: messages, stream: false })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error('DeepSeek error: ' + response.status + ' ' + errText);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  } catch(e) {
+    console.error('DeepSeek call failed:', e.message);
+    // Fallback to Zhipu
+    throw e;
+  }
+}
+
+
+// -------------------- AI Nutrition Advice --------------------
+app.post('/api/nutrition-advice', waitDB, auth, async (req, res) => {
+  try {
+    const { age, height, weight, bloodPressure, heartRate, bloodOxygen, bloodSugar, chronicDiseases, gender } = req.body;
+    const messages = [
+      { role: 'system', content: '你是一位专业的老年健康营养师。请根据用户提供的健康数据给出个性化的营养建议和饮食指导。回答要详细具体，包含食物推荐、禁忌和日常注意事项。' },
+      { role: 'user', content: '用户健康数据：年龄=' + (age || '未知') + '岁，身高=' + (height || '未知') + 'cm，体重=' + (weight || '未知') + 'kg，血压=' + (bloodPressure || '未知') + '，心率=' + (heartRate || '未知') + '次/分，血氧=' + (bloodOxygen || '未知') + '%，血糖=' + (bloodSugar || '未知') + '，慢性病史=' + (chronicDiseases || '无') + '。请根据这些数据给出详细的营养建议和饮食方案。' }
+    ];
+    let reply = '';
+    try {
+      reply = await callDeepSeek(messages);
+    } catch(e) {
+      // Try Zhipu as fallback
+      try {
+        const zhipuRes = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.ZHIPU_API_KEY },
+          body: JSON.stringify({ model: 'glm-4-flash', messages: messages, stream: false })
+        });
+        if (zhipuRes.ok) {
+          const zData = await zhipuRes.json();
+          reply = zData.choices?.[0]?.message?.content || '';
+        }
+      } catch(zErr) {
+        reply = '根据您的健康数据：';
+        if (bloodPressure) reply += '\n📊 血压：' + bloodPressure + 'mmHg';
+        if (heartRate) reply += '\n📊 心率：' + heartRate + '次/分';
+        if (bloodOxygen) reply += '\n📊 血氧：' + bloodOxygen + '%';
+        if (bloodSugar) reply += '\n📊 血糖：' + bloodSugar + 'mmol/L';
+        reply += '\n\n📋 个性化营养建议：';
+        if (chronicDiseases && chronicDiseases.indexOf('高血压') >= 0) reply += '\n1. 控制盐分摄入，每日不超过5g，少吃腌制食品和加工肉类；';
+        if (chronicDiseases && chronicDiseases.indexOf('糖尿病') >= 0) reply += '\n' + ((reply.indexOf('1.')>=0)?'2':'1') + '. 控制碳水化合物摄入，选择低GI食物如全麦、燕麦，避免精制糖和甜点；';
+        reply += '\n' + ((reply.indexOf('1.')>=0)?(reply.indexOf('2.')>=0?'3':'2'):'1') + '. 多食用富含膳食纤维的蔬菜水果，如西兰花、菠菜、苹果、梨，每天保证500g蔬菜；';
+        reply += '\n' + ((reply.indexOf('3.')>=0)?'4':(reply.indexOf('2.')>=0?'3':'2')) + '. 保持适量优质蛋白摄入，如鱼、禽肉、鸡蛋、豆制品，每周至少吃2次鱼；';
+        reply += '\n' + ((reply.indexOf('4.')>=0)?'5':(reply.indexOf('3.')>=0)?'4':(reply.indexOf('2.')>=0)?'3':'2') + '. 少食多餐，定时定量，每餐七分饱，避免暴饮暴食；';
+        if (bloodOxygen && parseInt(bloodOxygen) < 95) reply += '\n' + (reply.match(/\d+\./g)?.length+1||'6') + '. 血氧偏低，建议多做深呼吸练习，每天2次每次10分钟，必要时就医检查；';
+        if (bloodPressure) { var bp = bloodPressure.split('/'); if (bp[0] && parseInt(bp[0]) > 140) reply += '\n' + (reply.match(/\d+\./g)?.length+1||'6') + '. 血压偏高，建议减少钠盐摄入，保持情绪稳定，规律监测血压；'; }
+        if (heartRate && parseInt(heartRate) > 100) reply += '\n' + (reply.match(/\d+\./g)?.length+1||'6') + '. 心率偏快，建议避免剧烈运动，保持心情平和，如持续偏高请及时就医；';
+        if (bloodSugar && parseFloat(bloodSugar) > 7) reply += '\n' + (reply.match(/\d+\./g)?.length+1||'6') + '. 血糖偏高，建议控制主食摄入量，少食多餐，定期监测血糖；';
+      }
+    }
+        // If reply is still empty, use fallback
+    if (!reply || reply.trim() === '') {
+      reply = '根据您的健康数据：';
+      if (bloodPressure) reply += '\n📊 血压：' + bloodPressure + 'mmHg';
+      if (heartRate) reply += '\n📊 心率：' + heartRate + '次/分';
+      if (bloodOxygen) reply += '\n📊 血氧：' + bloodOxygen + '%';
+      if (bloodSugar) reply += '\n📊 血糖：' + bloodSugar + 'mmol/L';
+      reply += '\n\n📋 个性化营养建议：';
+      if (chronicDiseases && chronicDiseases.indexOf('高血压') >= 0) reply += '\n1. 控制盐分摄入，每日不超过5g，少吃腌制食品和加工肉类；';
+      if (chronicDiseases && chronicDiseases.indexOf('糖尿病') >= 0) reply += '\n2. 控制碳水化合物摄入，选择低GI食物如全麦、燕麦，避免精制糖和甜点；';
+      var advNum = 1;
+      if (chronicDiseases && chronicDiseases.indexOf('高血压') >= 0) { reply += '\n' + advNum + '. 控制盐分摄入，每日不超过5g，少吃腌制食品和加工肉类；'; advNum++; }
+      if (chronicDiseases && chronicDiseases.indexOf('糖尿病') >= 0) { reply += '\n' + advNum + '. 控制碳水化合物摄入，选择低GI食物如全麦、燕麦，避免精制糖和甜点；'; advNum++; }
+      reply += '\n' + advNum + '. 多食用富含膳食纤维的蔬菜水果，如西兰花、菠菜、苹果、梨，每天保证500g蔬菜；'; advNum++;
+      reply += '\n' + advNum + '. 保持适量优质蛋白摄入，如鱼、禽肉、鸡蛋、豆制品，每周至少吃2次鱼；'; advNum++;
+      reply += '\n' + advNum + '. 少食多餐，定时定量，每餐七分饱，避免暴饮暴食；'; advNum++;
+      if (bloodOxygen && parseInt(bloodOxygen) < 95) { reply += '\n' + advNum + '. 血氧偏低，建议多做深呼吸练习，每天2次每次10分钟，必要时就医检查；'; advNum++; }
+      if (bloodPressure) { var bp = bloodPressure.split('/'); if (bp[0] && parseInt(bp[0]) > 140) { reply += '\n' + advNum + '. 血压偏高，建议减少钠盐摄入，保持情绪稳定，规律监测血压；'; advNum++; } }
+      if (heartRate && parseInt(heartRate) > 100) { reply += '\n' + advNum + '. 心率偏快，建议避免剧烈运动，保持心情平和，如持续偏高请及时就医；'; advNum++; }
+      if (bloodSugar && parseFloat(bloodSugar) > 7) { reply += '\n' + advNum + '. 血糖偏高，建议控制主食摄入量，少食多餐，定期监测血糖；'; advNum++; }
+    }
+    reply += '\n\n---\n以上推送仅供参考，以实际营养师为参考标准';
+    res.json({ ok: true, reply: reply });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------- 智谱AI安全知识助手 --------------------
+// 你需要配置智谱的 API Key 和 Secret
+const ZHIPU_API_KEY = '34c3f2985feb404ea56f9b5cbbeaad23.QvORzAKtnsR3Vi4Y'; // 例如 'your-api-key'
+const ZHIPU_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+
+async function callZhipu(messages) {
+    if (!ZHIPU_API_KEY) {
+        return { error: '请配置智谱API Key' };
+    }
+    const response = await fetch(ZHIPU_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ZHIPU_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: 'glm-4-flash', // 免费模型，也可以用 glm-3-turbo
+            messages: messages,
+            stream: false
+        })
+    });
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`智谱API错误: ${errText}`);
+    }
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+// 安全助手接口（支持连续对话，需前端传递历史消息）
+app.post('/api/assistant', waitDB, auth, async (req, res) => {
+    try {
+        const { message, history } = req.body; // history 是可选的聊天记录
+        if (!message) return res.status(400).json({ error: '消息不能为空' });
+        // 构建给智谱的 messages
+        let messages = [];
+        if (history && Array.isArray(history)) {
+            messages = history.slice(-10); // 保留最近10条
+        }
+        messages.push({ role: 'user', content: message });
+        // 可以添加系统提示词，让助手扮演安全健康顾问
+        if (messages[0]?.role !== 'system') {
+            messages.unshift({
+                role: 'system',
+                content: '你是一个专业的老年健康安全助手，回答要通俗易懂、语气亲切、注重安全。如果用户提到疾病症状，提醒及时就医。'
+            });
+        }
+        const reply = await callZhipu(messages);
+        res.json({ reply });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 健康检查
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', dbReady: serverReady });
+});
+
+const PORT = process.env.PORT || 3000;
+
+// ── 管理后台 API ──
+const ADMIN_PWD = 'admin123';
+let DB_prescriptions = [];
+
+function adminAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token || !token.startsWith('admin-')) return res.status(401).json({ error: '未授权' });
+  try {
+    const user = Buffer.from(token.split('-')[1], 'base64').toString();
+    if (user === 'admin') { req.adminUser = user; next(); } else res.status(401).json({ error: 'token无效' });
+  } catch { res.status(401).json({ error: 'token无效' }); }
+}
+
+// 统计数据
+app.get('/api/admin/stats', adminAuth, async (req, res) => {
+  try {
+    const totalUsers = await usersCollection.countDocuments();
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const todayActive = await usersCollection.countDocuments({ updatedAt: { $gte: todayStart } });
+    const totalPrescriptions = DB_prescriptions ? DB_prescriptions.length : 0;
+    const allUsers = await usersCollection.find({}, { projection: { coins: 1 } }).toArray();
+    let totalCoins = 0, count = 0, maxCoins = 0;
+    allUsers.forEach(u => { const c = u.coins || 0; totalCoins += c; if (c > 0) count++; if (c > maxCoins) maxCoins = c; });
+    const avgCoins = count > 0 ? (totalCoins / count).toFixed(1) : 0;
+    res.json({ totalUsers, todayActive, totalPrescriptions, totalCoins, avgCoins, maxCoins, userCount: allUsers.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 用户管理
+app.get('/api/admin/users', adminAuth, async (req, res) => { try { const users = await usersCollection.find({}).toArray(); res.json({ data: users }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.get('/api/admin/users/:phone', adminAuth, async (req, res) => { try { const user = await usersCollection.findOne({ phone: req.params.phone }); if (!user) return res.status(404).json({ error: '用户不存在' }); res.json({ user }); } catch (err) { res.status(500).json({ error: err.message }); } });
+
+// 服务管理
+app.get('/api/admin/services', adminAuth, async (req, res) => { try { const s = await servicesCollection.find({}).sort({ createdAt: -1 }).toArray(); res.json({ data: s }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.post('/api/admin/service/create', adminAuth, async (req, res) => {
+  try { const { name, price, description, maxParticipants } = req.body; if (!name || !price) return res.status(400).json({ error: "名称和费用不能为空" }); const service = { id: String(Date.now()), name, price: parseFloat(price), description: description || "", maxParticipants: parseInt(maxParticipants) || 100, enrolled: 0, active: true, createdAt: new Date().toISOString() }; await servicesCollection.insertOne(service); res.json({ ok: true, service }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/service/update', adminAuth, async (req, res) => {
+  try { const { id, name, price, description, maxParticipants, active } = req.body; if (!id) return res.status(400).json({ error: "缺少服务ID" }); const u={}; if(name)u.name=name; if(price!==undefined)u.price=parseFloat(price); if(description!==undefined)u.description=description; if(maxParticipants!==undefined)u.maxParticipants=parseInt(maxParticipants); if(active!==undefined)u.active=active; await servicesCollection.updateOne({id:id},{$set:u}); res.json({ ok: true }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/service/delete', adminAuth, async (req, res) => { try { const { id } = req.body; if (!id) return res.status(400).json({ error: "缺少服务ID" }); await servicesCollection.deleteOne({ id: id }); res.json({ ok: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.get('/api/services', async (req, res) => { try { const s = await servicesCollection.find({ active: { $ne: false } }).toArray(); res.json({ data: s }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.post('/api/service/purchase', auth, async (req, res) => {
+  try { const { serviceId } = req.body; if (!serviceId) return res.status(400).json({ error: "缺少服务ID" }); const service = await servicesCollection.findOne({ id: serviceId }); if (!service) return res.status(404).json({ error: "服务不存在" }); if (service.active === false) return res.status(400).json({ error: "服务已下架" }); if (service.enrolled >= service.maxParticipants) return res.status(400).json({ error: "参与人数已满" }); const user = await usersCollection.findOne({ phone: req.phone }); if (!user) return res.status(401).json({ error: "用户不存在" }); if (user.purchasedServices && user.purchasedServices.includes(serviceId)) return res.json({ ok: true, message: "已购买过该服务" }); const userCoins = (user.coins || 0); if (userCoins < service.price) return res.status(400).json({ error: "健康币不足，请先充值" }); await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -service.price }, $push: { purchasedServices: serviceId }, $set: { updatedAt: new Date() } }); await servicesCollection.updateOne({ id: serviceId }, { $inc: { enrolled: 1 } }); res.json({ ok: true, message: "购买成功", coinsLeft: (userCoins - service.price) }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/my-services', auth, async (req, res) => { try { const user = await usersCollection.findOne({ phone: req.phone }); if (!user || !user.purchasedServices) return res.json({ data: [], coins: user?.coins || 0 }); const my = await servicesCollection.find({ id: { $in: user.purchasedServices } }).toArray(); res.json({ data: my, coins: user.coins || 0 }); } catch (err) { res.status(500).json({ error: err.message }); } });
+
+// 处方管理
+app.post('/api/admin/generate-prescription', adminAuth, async (req, res) => {
+  try {
+    const { profile, healthData, doctorNotes } = req.body;
+    const age = parseInt(profile.age) || 65; const hasChronic = !!profile.hasChronic;
+    const hr = parseInt(healthData.heartRate) || 75; const ox = parseInt(healthData.bloodOxygen) || 97;
+    const sugar = parseFloat(healthData.bloodSugar) || 5.5; const weight = parseFloat(profile.weight) || 65; const height = parseFloat(profile.height) || 165;
+    const bmi = weight / ((height/100)*(height/100)); const maxHR = 220 - age;
+    const targetHRHigh = Math.round(hasChronic ? maxHR*0.6 : maxHR*0.75);
+    let score = 0;
+    if (hr>=60&&hr<=80) score+=3; else if (hr>=50&&hr<=100) score+=1;
+    if (ox>=96) score+=3; else if (ox>=93) score+=1;
+    if (sugar>=3.9&&sugar<=6.1) score+=2; else if (sugar<=7.0) score+=1;
+    const bps = parseInt(healthData.bloodPressure?.split('/')[0])||120;
+    if (bps>=90&&bps<=130) score+=3; else if (bps<=140) score+=1;
+    if (bmi>=18.5&&bmi<=24.9) score+=2; else if (bmi<=29.9) score+=1;
+    if (hasChronic) score-=2;
+    const level = score>=10?'良好':score>=6?'一般':'需关注';
+    const exercises=[];
+    exercises.push({name:'热身运动',icon:'\uD83C\uDFC3',detail:'关节活动+慢走5-10分钟'});
+    if(level==='良好'){exercises.push({name:'快走',icon:'\uD83D\uDEB6',detail:'4-5km/h，20-30分钟'});exercises.push({name:'太极拳',icon:'\uD83E\uDDD8',detail:'24式太极拳，15-20分钟'});
+exercises.push({name:'八段锦',icon:'\uD83E\uDDD8',detail:'完整八段锦一套，15分钟'});}
+    else if(level==='一般'){exercises.push({name:'慢走',icon:'\uD83D\uDEB6',detail:'3-4km/h，20分钟'});exercises.push({name:'坐姿体操',icon:'\uD83E\uDDCE',detail:'坐位抬腿+上肢伸展，3组'});exercises.push({name:'手指操',icon:'\uD83E\uDD1C',detail:'手指开合，5分钟'});}
+    else{exercises.push({name:'床上活动',icon:'\uD83D\uDECF',detail:'脚踝泵+膝关节屈伸'});exercises.push({name:'上肢拉伸',icon:'\uD83D\uDE46',detail:'坐姿手臂上举'});}
+    exercises.push({name:'整理放松',icon:'\uD83E\uDDD8',detail:'全身拉伸+深呼吸，5-10分钟'});
+    const cautions=['运动前需热身','出现胸闷头晕立即停止','饭后1小时运动']; if(hasChronic)cautions.push('运动前后测血压/血糖');
+    res.json({doctor:doctorNotes?'专业医师/营养师':'智能系统',goal:level==='良好'?'维持健康水平':level==='一般'?'改善体质':'恢复基础活动能力',
+intensity:level==='良好'?'中低强度':level==='一般'?'低强度':'极低强度',maxHeartRate:targetHRHigh,frequency:level==='良好'?'每周5-7次':'每周3-5次',
+duration:'每次20-30分钟',items:exercises,cautions:cautions.join('；'),healthLevel:level,healthScore:score,bmi:bmi.toFixed(1),
+dietAdvice:hasChronic?'控制盐分(<5g/天)，增加膳食纤维':'均衡营养，多吃蔬果',createdAt:new Date().toISOString()});
+  } catch(err){res.status(500).json({error:err.message});}
+});
+app.post('/api/admin/prescription/save', adminAuth, async (req, res) => { try { const {phone,prescription,doctorNotes}=req.body; if(!phone||!prescription)return res.status(400).json({error:'参数不足'}); DB_prescriptions.push({phone,prescription,doctorNotes,savedAt:new Date().toISOString()}); await usersCollection.updateOne({phone},{$set:{prescription:JSON.stringify(prescription),updatedAt:new Date()}}); res.json({ok:true}); } catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/admin/prescription/:phone', adminAuth, async (req, res) => { try { const rx = DB_prescriptions.filter(p=>p.phone===req.params.phone).sort((a,b)=>b.savedAt>a.savedAt?1:-1); res.json({data:rx[0]?rx[0].prescription:null}); } catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/my-prescription', auth, async (req, res) => { try { const user = await usersCollection.findOne({phone:req.phone}); const rx = user.prescription?JSON.parse(user.prescription):null; res.json({data:rx}); } catch(err){res.status(500).json({error:err.message});} });
+
+// 健康币
+app.post('/api/coins/recharge', auth, async (req, res) => { try { const amount=parseInt(req.body.amount)||0; if(amount<=0)return res.status(400).json({error:"充值金额无效"}); await usersCollection.updateOne({phone:req.phone},{$inc:{coins:amount},$push:{coinRecords:{type:"recharge",amount:amount,method:req.body.method||"微信",time:new Date().toISOString()}},$set:{updatedAt:new Date()}}); const user=await usersCollection.findOne({phone:req.phone}); res.json({ok:true,message:"充值成功",coins:user.coins}); }catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/coins', auth, async (req, res) => { try { const user=await usersCollection.findOne({phone:req.phone}); res.json({coins:user?.coins||0,records:user?.coinRecords||[]}); }catch(err){res.status(500).json({error:err.message});} });
+
+// ── 获取签到状态 ──
+app.get('/api/sign/status', auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const today = new Date().toISOString().slice(0,10);
+    const signedIn = user?.lastSigninDate === today;
+    var hist = user?.signHistory || [];
+    var streak = 0; var d = new Date();
+    while(true){var ds=d.toISOString().slice(0,10); if(hist.includes(ds)){streak++;d.setDate(d.getDate()-1);}else break;}
+    res.json({ signedIn, streak: Math.max(1, streak), history: hist });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/coins/signin', auth, async (req, res) => { try { const user=await usersCollection.findOne({phone:req.phone}); const today=new Date().toISOString().slice(0,10); if(user.lastSigninDate===today)return res.status(400).json({error:"今日已签到"}); var hist=user.signHistory||[]; if(hist[hist.length-1]!==today)hist.push(today); var streak=0; var d=new Date(); while(true){var ds=d.toISOString().slice(0,10); if(hist.includes(ds)){streak++;d.setDate(d.getDate()-1);}else break;} await usersCollection.updateOne({phone:req.phone},{$inc:{coins:10},$set:{lastSigninDate:today,signHistory:hist,updatedAt:new Date()},$push:{coinRecords:{type:"signin",amount:10,time:new Date().toISOString()}}}); res.json({ok:true,message:"签到成功+10健康币",streak:Math.max(1,streak)}); }catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/admin/coins', adminAuth, async (req, res) => { try { const users=await usersCollection.find({},{projection:{phone:1,coins:1,updatedAt:1}}).toArray(); res.json({data:users}); }catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/admin/coin-records', adminAuth, async (req, res) => { try { const users=await usersCollection.find({},{projection:{phone:1,coinRecords:1}}).toArray(); const records=[]; users.forEach(u=>{if(u.coinRecords)u.coinRecords.forEach(r=>records.push({phone:u.phone,...r}));}); records.sort((a,b)=>(b.time||"").localeCompare(a.time||"")); res.json({data:records}); }catch(err){res.status(500).json({error:err.message});} });
+app.post('/api/admin/coins/reset', adminAuth, async (req, res) => { try { const{phone,amount}=req.body; if(!phone)return res.status(400).json({error:"缺少手机号"}); await usersCollection.updateOne({phone:phone},{$set:{coins:parseInt(amount)||0},$push:{coinRecords:{type:"admin_reset",amount:parseInt(amount)||0,time:new Date().toISOString()}}}); res.json({ok:true}); }catch(err){res.status(500).json({error:err.message});} });
+app.post('/api/admin/export-report', adminAuth, async (req, res) => { try { const{users}=req.body; if(!users||!users.length)return res.json({ok:true,report:'暂无用户数据'}); let r='颐路相伴数据报告\n'; r+='用户总数:'+users.length+'人\n'; res.json({ok:true,report:r}); }catch(err){res.status(500).json({error:err.message});} });
+
+// 账户
+app.post('/api/account/delete', auth, async (req, res) => { try { await usersCollection.deleteOne({phone:req.phone}); res.json({ok:true,message:"账户已注销"}); }catch(err){res.status(500).json({error:err.message});} });
+
+// ── 好友系统 ──
+app.post('/api/friend/search', auth, async (req, res) => { try { const{phone}=req.body; if(!phone)return res.status(400).json({error:"请输入手机号"}); const user=await usersCollection.findOne({phone},{projection:{phone:1,role:1,data:1}}); if(!user)return res.status(404).json({error:"用户不存在"}); if(user.phone===req.phone)return res.status(400).json({error:"不能添加自己为好友"}); let profile=user.data?.profile||{}; if(typeof profile==='string'){try{profile=JSON.parse(profile);}catch(e){profile={};}} let name=profile.name||''; res.json({user:{phone:user.phone,role:user.role,name}}); }catch(err){res.status(500).json({error:err.message});} });
+app.post('/api/friend/request', auth, async (req, res) => { try { const{toPhone}=req.body; if(!toPhone)return res.status(400).json({error:"缺少目标手机号"}); const exist=await friendsCollection.findOne({from:req.phone,to:toPhone}); if(exist)return res.status(400).json({error:"已经发送过请求"}); const rev=await friendsCollection.findOne({from:toPhone,to:req.phone}); if(rev){if(rev.status==='accepted')return res.status(400).json({error:"已经是好友"}); if(rev.status==='pending'){await friendsCollection.updateOne({_id:rev._id},{$set:{status:'accepted'}}); return res.json({ok:true,message:"对方已邀请过您，已自动成为好友"});}} await friendsCollection.insertOne({from:req.phone,to:toPhone,status:'pending',createdAt:new Date().toISOString()}); res.json({ok:true}); }catch(err){res.status(500).json({error:err.message});} });
+
+// ── 好友备注 ──
+app.post('/api/friend/alias', auth, async (req, res) => {
+  try {
+    const { friendPhone, alias } = req.body;
+    if (!friendPhone) return res.status(400).json({ error: "缺少好友手机号" });
+    if (alias && alias.trim()) {
+      await usersCollection.updateOne({ phone: req.phone }, { $set: { ["aliases."+friendPhone]: alias.trim() } });
+    } else {
+      await usersCollection.updateOne({ phone: req.phone }, { $unset: { ["aliases."+friendPhone]: "" } });
+    }
+    res.json({ ok: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/friends', auth, async (req, res) => { try { const accepted=await friendsCollection.find({$or:[{from:req.phone,status:'accepted'},{to:req.phone,status:'accepted'}]}).toArray(); const phones=[]; accepted.forEach(r=>{phones.push(r.from===req.phone?r.to:r.from);}); const users=await usersCollection.find({phone:{$in:phones}},{projection:{phone:1,role:1,data:1}}).toArray(); const friendsWithMsg=[]; for(const u of users){const lastMsg=await messagesCollection.findOne({$or:[{from:req.phone,to:u.phone},{from:u.phone,to:req.phone}]},{sort:{timestamp:-1}}); let p=u.data?.profile||{}; if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}} let nm=p.name||''; friendsWithMsg.push({phone:u.phone,role:u.role,name:nm,lastMessage:lastMsg?lastMsg.text:'',lastTime:lastMsg?lastMsg.timestamp:''});} res.json({data:friendsWithMsg}); }catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/friend/requests', auth, async (req, res) => { try { const requests=await friendsCollection.find({to:req.phone,status:'pending'}).sort({createdAt:-1}).toArray(); const fromPhones=requests.map(r=>r.from); const users=await usersCollection.find({phone:{$in:fromPhones}},{projection:{phone:1,role:1,data:1}}).toArray(); const result=requests.map(r=>{const u=users.find(u=>u.phone===r.from); let pp=u?.data?.profile||{}; if(typeof pp==='string'){try{pp=JSON.parse(pp);}catch(e){pp={};}} let nm=pp.name||''; return{...r,fromRole:u?.role||'',fromName:nm};}); res.json({data:result}); }catch(err){res.status(500).json({error:err.message});} });
+app.post('/api/friend/accept', auth, async (req, res) => { try { await friendsCollection.updateOne({from:req.body.fromPhone,to:req.phone,status:'pending'},{$set:{status:'accepted'}}); res.json({ok:true}); }catch(err){res.status(500).json({error:err.message});} });
+app.post('/api/friend/reject', auth, async (req, res) => { try { await friendsCollection.updateOne({from:req.body.fromPhone,to:req.phone,status:'pending'},{$set:{status:'rejected'}}); res.json({ok:true}); }catch(err){res.status(500).json({error:err.message});} });
+
+// ── 聊天系统 ──
+app.post('/api/chat/send', auth, async (req, res) => { try { const{to,text}=req.body; if(!to||!text)return res.status(400).json({error:"参数不足"}); const msg={from:req.phone,to,text,timestamp:new Date().toISOString(),read:false}; await messagesCollection.insertOne(msg); res.json({ok:true,msg}); }catch(err){res.status(500).json({error:err.message});} });
+app.get('/api/chat/messages', auth, async (req, res) => { try { const{friend}=req.query; if(!friend)return res.status(400).json({error:"缺少好友手机号"}); const msgs=await messagesCollection.find({$or:[{from:req.phone,to:friend},{from:friend,to:req.phone}]}).sort({timestamp:1}).toArray(); await messagesCollection.updateMany({from:friend,to:req.phone,read:false},{$set:{read:true}}); res.json({data:msgs}); }catch(err){res.status(500).json({error:err.message});} });
+
+
+// ── 更新个人资料 ──
+app.post('/api/profile/update', auth, async (req, res) => {
+  try {
+    const { name, height, weight, age, hasChronic } = req.body;
+    const profile = { name: name || '', height: height || '', weight: weight || '', age: age || '', hasChronic: !!hasChronic };
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const data = user?.data || {};
+    data.profile = profile;
+    await usersCollection.updateOne({ phone: req.phone }, { $set: { data: data, updatedAt: new Date() } });
+    res.json({ ok: true, profile });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// ── 紧急联系人 ──
+app.get('/api/emergency/contacts', waitDB, auth, async (req, res) => {
+  try { const user=await usersCollection.findOne({phone:req.phone}); res.json({contacts:user?.emergencyContacts||[]}); } catch(err){res.status(500).json({error:err.message});}
+});
+app.post('/api/emergency/contacts', waitDB, auth, async (req, res) => {
+  try { const{name,phone:cp,priority}=req.body; if(!name||!cp)return res.status(400).json({error:"姓名和手机号不能为空"}); const user=await usersCollection.findOne({phone:req.phone}); let contacts=user?.emergencyContacts||[]; const idx=contacts.findIndex(function(c){return c.phone===cp;}); const ct={name,phone:cp,priority:priority||(contacts.length+1)}; if(idx>=0) contacts[idx]=ct; else contacts.push(ct); await usersCollection.updateOne({phone:req.phone},{$set:{emergencyContacts:contacts}}); res.json({ok:true,contacts}); } catch(err){res.status(500).json({error:err.message});}
+});
+app.post('/api/emergency/contacts/delete', waitDB, auth, async (req, res) => {
+  try { const{phone:cp}=req.body; const user=await usersCollection.findOne({phone:req.phone}); let contacts=(user?.emergencyContacts||[]).filter(function(c){return c.phone!==cp;}); await usersCollection.updateOne({phone:req.phone},{$set:{emergencyContacts:contacts}}); res.json({ok:true,contacts}); } catch(err){res.status(500).json({error:err.message});}
+});
+
+
+// Verify user exists (for clearing stale localStorage on startup)
+app.get('/api/verify-user', auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({phone: req.phone});
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    res.json({ ok: true });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+// ── 智能算法 - 营养建议 ──
+app.post("/api/nutrition-advice", auth, async (req, res) => {
+  try {
+    const { age, height, weight, bloodPressure, heartRate, bloodOxygen, bloodSugar, chronicDiseases, gender } = req.body;
+    let prompt = "请根据以下用户健康数据提供个性化的营养建议和运动建议：\n";
+    if (age) prompt += "年龄：" + age + "岁\n";
+    if (height) prompt += "身高：" + height + "cm\n";
+    if (weight) prompt += "体重：" + weight + "kg\n";
+    if (gender) prompt += "性别：" + gender + "\n";
+    if (bloodPressure) prompt += "血压：" + bloodPressure + "mmHg\n";
+    if (heartRate) prompt += "心率：" + heartRate + "次/分\n";
+    if (bloodOxygen) prompt += "血氧：" + bloodOxygen + "%\n";
+    if (bloodSugar) prompt += "血糖：" + bloodSugar + "mmol/L\n";
+    if (chronicDiseases) prompt += "慢性病史：" + chronicDiseases + "\n";
+    prompt += "\n请提供：\n1. 当前健康状态评估\n2. 饮食营养建议\n3. 运动方案建议\n4. 注意事项\n\n以上推送仅供参考，以实际营养师为参考标准。";
+
+    if (process.env.DEEPSEEK_API_KEY) {
+      try {
+        const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + process.env.DEEPSEEK_API_KEY },
+          body: JSON.stringify({ model: "deepseek-chat", messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 2000 })
+        });
+        const data = await resp.json();
+        if (data.choices && data.choices[0])
+          return res.json({ ok: true, advice: data.choices[0].message.content });
+      } catch(e) { console.warn("DeepSeek error:", e.message); }
+    }
+
+    const bmi = weight && height ? (weight / ((height/100)*(height/100))).toFixed(1) : null;
+    let advice = "【健康评估报告】\n\n";
+    advice += "个人健康数据：\n";
+    if (age) advice += "• 年龄：" + age + "岁\n";
+    if (bmi) advice += "• BMI：" + bmi + "\n";
+    if (bloodPressure) advice += "• 血压：" + bloodPressure + " mmHg\n";
+    if (heartRate) advice += "• 心率：" + heartRate + " 次/分\n";
+    if (bloodOxygen) advice += "• 血氧：" + bloodOxygen + "%\n";
+    if (bloodSugar) advice += "• 血糖：" + bloodSugar + " mmol/L\n";
+    advice += "\n【营养建议】\n• 合理控制总热量摄入\n• 增加优质蛋白和膳食纤维\n• 减少高盐高脂高糖食物\n• 每日饮水1500-2000ml\n";
+    advice += "\n【运动建议】\n• 每周3-5次有氧运动\n• 每次30-45分钟\n• 心率控制在最大心率的60%-70%\n";
+    if (chronicDiseases) advice += "• 注意慢性病管理，运动前咨询医生\n";
+    advice += "\n【注意事项】\n• 以上建议仅供参考，具体请咨询专业医师或营养师\n• 如有不适请及时就医";
+
+    res.json({ ok: true, advice: advice });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// 用户搜索
+app.get("/api/user/search", auth, async (req, res) => {
+  try {
+    const phone = req.query.phone;
+    if (!phone) return res.status(400).json({ error: "请输入手机号" });
+    const user = await usersCollection.findOne({ phone: phone }, { projection: { phone: 1, role: 1, data: 1 } });
+    if (!user) return res.json({ user: null });
+    res.json({ user: { phone: user.phone, role: user.role, data: user.data } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 获取今日健康数据
+app.get("/api/health-data/today", auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const dailyRecords = (user && user.data && user.data.dailyRecords) || {};
+    const today = new Date().toISOString().slice(0, 10);
+    const record = dailyRecords[today] || null;
+    res.json({ data: record });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 获取用户资料
+app.get("/api/profile", auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const data = (user && user.data) || {};
+    const profile = data.profile || {};
+    if (typeof profile === "string") {
+      try { var pp = JSON.parse(profile); res.json({ profile: pp }); return; } catch (e) {}
+    }
+    res.json({ profile: profile });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 保存今日健康数据
+app.post("/api/health-data/save", auth, async (req, res) => {
+  try {
+    const { bp, heartRate, steps, sleep, bloodOxygen, bloodSugar } = req.body;
+    const today = new Date().toISOString().slice(0, 10);
+    const user = await usersCollection.findOne({ phone: req.phone });
+    let dailyRecords = (user && user.data && user.data.dailyRecords) || {};
+    dailyRecords[today] = { bp: bp || "", heartRate: heartRate || "", steps: steps || "", sleep: sleep || "", bloodOxygen: bloodOxygen || "", bloodSugar: bloodSugar || "" };
+    const data = (user && user.data) || {};
+    data.dailyRecords = dailyRecords;
+    await usersCollection.updateOne({ phone: req.phone }, { $set: { data: data, updatedAt: new Date() } });
+    res.json({ ok: true, record: dailyRecords[today] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 同步数据到服务器
+app.post("/api/data/sync", auth, async (req, res) => {
+  try {
+    const { healthData, dailyRecords, profile, contacts } = req.body;
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const data = (user && user.data) || {};
+    if (healthData) data.healthData = healthData;
+    if (dailyRecords) data.dailyRecords = dailyRecords;
+    if (profile) data.profile = profile;
+    if (contacts) data.contacts = contacts;
+    await usersCollection.updateOne({ phone: req.phone }, { $set: { data: data, updatedAt: new Date() } });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// 营养师端 - 查看患者数据
+app.get('/api/doctor/patient-data', auth, async (req, res) => {
+  try {
+    const doctor = await usersCollection.findOne({ phone: req.phone });
+    if (!doctor || doctor.role !== '医生与营养师') {
+      return res.status(403).json({ error: '仅限营养师端使用' });
+    }
+    const patientPhone = req.query.phone;
+    if (!patientPhone) return res.status(400).json({ error: '请输入患者手机号' });
+    
+    const patient = await usersCollection.findOne({ phone: patientPhone });
+    if (!patient) return res.status(404).json({ error: '未找到该用户' });
+    
+    let profile = patient.data?.profile || {};
+    if (typeof profile === 'string') { try { profile = JSON.parse(profile); } catch(e) { profile = {}; } }
+    
+    const dailyRecords = patient.data?.dailyRecords || {};
+    const allRecords = Object.keys(dailyRecords);
+    
+    res.json({
+      patient: {
+        phone: patient.phone,
+        role: patient.role,
+        name: profile.name || '',
+        profile: profile
+      },
+      dailyRecords: dailyRecords,
+      recordCount: allRecords.length
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 营养师端 - 发送运动处方
+app.post('/api/doctor/send-prescription', auth, async (req, res) => {
+  try {
+    const doctor = await usersCollection.findOne({ phone: req.phone });
+    if (!doctor || doctor.role !== '医生与营养师') {
+      return res.status(403).json({ error: '仅限营养师端使用' });
+    }
+    const { patientPhone, prescription, doctorNotes } = req.body;
+    if (!patientPhone || !prescription) {
+      return res.status(400).json({ error: '参数不足' });
+    }
+    // Verify patient exists
+    const patient = await usersCollection.findOne({ phone: patientPhone });
+    if (!patient) {
+      return res.status(404).json({ error: '未找到该用户' });
+    }
+    // Save prescription to patient record
+    await usersCollection.updateOne(
+      { phone: patientPhone },
+      { $set: { prescription: JSON.stringify(prescription), updatedAt: new Date() } }
+    );
+    // Also record it in the prescription history
+    DB_prescriptions.push({
+      phone: patientPhone,
+      prescription: prescription,
+      doctorNotes: doctorNotes || '',
+      doctorName: doctor.data?.profile?.name || '营养师',
+      doctorPhone: req.phone,
+      savedAt: new Date().toISOString()
+    });
+    res.json({ ok: true, message: '处方已发送' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 课程管理
+app.post('/api/admin/course/create', adminAuth, async (req, res) => {
+  try { const { name, price, description, maxParticipants } = req.body; if (!name || !price) return res.status(400).json({ error: '名称和费用不能为空' }); const course = { id: String(Date.now()), name, price: parseFloat(price), description: description || '', maxParticipants: parseInt(maxParticipants) || 100, enrolled: 0, active: true, createdAt: new Date().toISOString() }; await coursesCollection.insertOne(course); res.json({ ok: true, course }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/admin/courses', adminAuth, async (req, res) => { try { const c = await coursesCollection.find({}).sort({ createdAt: -1 }).toArray(); res.json({ data: c }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.post('/api/admin/course/delete', adminAuth, async (req, res) => { try { const { id } = req.body; if (!id) return res.status(400).json({ error: '缺少课程ID' }); await coursesCollection.deleteOne({ id: id }); res.json({ ok: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.get('/api/courses', async (req, res) => { try { const c = await coursesCollection.find({ active: { $ne: false } }).toArray(); res.json({ data: c }); } catch (err) { res.status(500).json({ error: err.message }); } });
+// 子女端为老人购买课程
+app.post('/api/course/purchase-for-elderly', auth, async (req, res) => {
+  try {
+    const { courseId, elderlyPhone } = req.body;
+    if (!courseId || !elderlyPhone) return res.status(400).json({ error: '参数不足' });
+    const course = await coursesCollection.findOne({ id: courseId });
+    if (!course) return res.status(404).json({ error: '课程不存在' });
+    if (course.active === false) return res.status(400).json({ error: '课程已下架' });
+    if (course.enrolled >= course.maxParticipants) return res.status(400).json({ error: '人数已满' });
+    const elderly = await usersCollection.findOne({ phone: elderlyPhone });
+    if (!elderly) return res.status(404).json({ error: '用户不存在' });
+    if (elderly.purchasedCourses && elderly.purchasedCourses.includes(courseId)) return res.json({ ok: true, message: '该用户已拥有此课程' });
+    const buyer = await usersCollection.findOne({ phone: req.phone });
+    const userCoins = (buyer.coins || 0);
+    if (userCoins < course.price) return res.status(400).json({ error: '健康币不足' });
+    await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -course.price }, $set: { updatedAt: new Date() } });
+    await usersCollection.updateOne({ phone: elderlyPhone }, { $push: { purchasedCourses: courseId }, $set: { updatedAt: new Date() } });
+    await coursesCollection.updateOne({ id: courseId }, { $inc: { enrolled: 1 } });
+    res.json({ ok: true, message: '购买成功', coinsLeft: (userCoins - course.price) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/my-courses', auth, async (req, res) => { try { const user = await usersCollection.findOne({ phone: req.phone }); if (!user || !user.purchasedCourses) return res.json({ data: [] }); const my = await coursesCollection.find({ id: { $in: user.purchasedCourses } }).toArray(); res.json({ data: my }); } catch (err) { res.status(500).json({ error: err.message }); } });
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
