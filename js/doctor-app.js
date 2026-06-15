@@ -849,6 +849,8 @@ PAGES.messages = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">消息</div><div class="header-subtitle">${contacts.length} 位联系人</div></div><div class="header-add" id="add-contact-btn">＋</div></div>
             <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>🔍</span><input id="friend-search-input" class="form-input" placeholder="输入手机号搜索好友" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">搜索</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">👥</div><div><div class="t">群聊</div><div class="s">点击查看我的群聊</div></div></div>
             <div class="banner" id="assistant-btn"><div class="emoji">🤖</div><div><div class="t">安全助手</div><div class="s">智能健康顾问（支持语音）</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">🧠</div><div><div class="t">智能算法</div><div class="s">基于健康数据的营养运动建议</div></div></div>
+            <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">📩 好友请求</div><div id="friend-requests-list"></div></div>
+            <div class="card" id="friends-card" style="display:none;"><div class="card-title">👥 我的好友</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
             <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div></div>`).join('')}</div>
         </div>`;
     app.querySelectorAll('.list-item').forEach(el => el.onclick = () => navigate('chat', { name: el.dataset.name }));
@@ -858,6 +860,44 @@ PAGES.messages = (app) => {
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
+    // Load friend requests and friends
+    if(typeof currentUser !== 'undefined' && currentUser && currentUser.token){
+      fetch(API_BASE+'/api/friend/requests',{headers:{'Authorization':'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();}).then(function(d){
+          var card=document.getElementById('friend-requests-card');
+          var list=document.getElementById('friend-requests-list');
+          if(!card||!list)return;
+          if(d.data&&d.data.length){
+            card.style.display='';
+            var html='';
+            d.data.forEach(function(req){
+              var nm=req.fromName||req.from;
+              html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f2;">';
+              html+='<span>👤 '+escapeHtml(nm)+'</span>';
+              html+='<div><button class="btn btn-primary" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="acceptFriend(\''+req.from+'\')">接受</button>';
+              html+='<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="rejectFriend(\''+req.from+'\')">拒绝</button></div></div>';
+            });
+            list.innerHTML=html;
+          } else { card.style.display='none'; }
+        });
+      fetch(API_BASE+'/api/friends',{headers:{'Authorization':'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();}).then(function(d){
+          var list=document.getElementById('friends-list');
+          if(!list)return;
+          if(d.data&&d.data.length){
+            var card=document.getElementById('friends-card');
+            if(card) card.style.display='';
+            list.innerHTML=d.data.map(function(f){
+              var nm=f.name||f.phone;
+              return '<div class="list-item" data-friend="'+escapeHtml(f.phone)+'"><div class="avatar">👤</div><div class="list-content"><div class="list-name">'+escapeHtml(nm)+'</div><div class="list-desc">'+escapeHtml(f.lastMessage||'暂无消息')+'</div></div></div>';
+            }).join('');
+            list.querySelectorAll('.list-item').forEach(function(el){
+              el.onclick=function(){ var nm=this.querySelector('.list-name').textContent; navigate('chat',{name:nm,phone:this.dataset.friend}); };
+            });
+          } else { if(document.getElementById('friends-card')) document.getElementById('friends-card').style.display='none'; }
+        });
+    }
+
 };
 
 PAGES.chat = (app, params) => {
@@ -2033,6 +2073,18 @@ window.customerService = function() {
     '<button onclick="this.parentNode.parentNode.remove()" style="background:#ff6b35;color:#fff;border:none;padding:10px 40px;border-radius:24px;font-size:16px;cursor:pointer;">我知道了</button>' +
   '</div>';
   document.body.appendChild(d);
+// Friend request actions
+function acceptFriend(phone){
+  if(!currentUser){toast('请先登录');return;}
+  fetch(API_BASE+'/api/friend/accept',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已接受');render();}else toast(d.error||'操作失败');});
+}
+function rejectFriend(phone){
+  if(!currentUser){toast('请先登录');return;}
+  fetch(API_BASE+'/api/friend/reject',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已拒绝');render();}else toast(d.error||'操作失败');});
+}
+
   d.onclick = function(e) { if(e.target===d) d.remove(); };
 };
 
