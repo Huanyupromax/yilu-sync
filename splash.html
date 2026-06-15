@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>颐路相伴 · 启动引导</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #fff5e6 0%, #ffe8d1 25%, #e8f5e0 75%, #d4edd9 100%);
+  display:flex; align-items:center; justify-content:center;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.splash { text-align:center; padding:40px 24px; max-width:420px; width:100%; }
+.logo-circle { width:120px; height:120px; border-radius:50%; background:#fff; display:inline-flex; align-items:center; justify-content:center; margin-bottom:24px; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+.logo-circle img { width:110px; height:110px; }
+.title { font-size:42px; font-weight:800; color:#f08a24; letter-spacing:6px; margin-bottom:12px; }
+.subtitle { font-size:17px; color:#555; line-height:1.5; margin-bottom:2px; }
+.subtitle.last { margin-bottom:32px; }
+.btn-start {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:100%; max-width:300px; padding:15px 0; border-radius:26px;
+  font-size:20px; font-weight:700; border:none; cursor:pointer;
+  background:#f08a24; color:#fff; margin-bottom:12px; transition:background 0.15s;
+}
+.btn-start:active { background:#d9761a; }
+.btn-register {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:100%; max-width:300px; padding:15px 0; border-radius:26px;
+  font-size:20px; font-weight:700; border:2px solid #f08a24; cursor:pointer;
+  background:#fff; color:#f08a24; margin-bottom:32px; transition:background 0.15s;
+}
+.btn-register:active { background:#fff5e6; }
+.footer { font-size:14px; color:#777; line-height:1.6; letter-spacing:0.5px; }
+</style>
+</head>
+<body>
+<div class="splash">
+  <div class="logo-circle"><img src="images/logo-desktop.png" alt="颐路相伴"></div>
+  <div class="title">颐路相伴</div>
+  <div class="subtitle">银龄运动健康智慧平台</div>
+  <div class="subtitle last">陪您走好每一步健康之路</div>
+  <button class="btn-start" onclick="location.href='./'">开始使用</button>
+  <button class="btn-register" onclick="location.href='./#/register'">首次使用·录入资料</button>
+  <div class="footer">专业医师指导 · 就近社区服务 · 子女实时关爱</div>
+</div>
+</body>
+</html>
