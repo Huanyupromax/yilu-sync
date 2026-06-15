@@ -1,4 +1,4 @@
-﻿const API = '/api/admin';
+const API = '/api/admin';
 var adminUser = null;
 
 function esc(s) {
@@ -53,7 +53,6 @@ function sidebarHtml(current) {
     {key:'prescriptions',icon:'📋',label:'运动处方'},
     {key:'services',icon:'💳',label:'付费管理'},
     {key:'coins',icon:'🪙',label:'健康币管理'},
-    {key:'courses',icon:'🎓',label:'课程管理'},
     {key:'data',icon:'📈',label:'健康数据'}
   ];
   var nav = items.map(function(i){
@@ -303,10 +302,7 @@ pages.services = async function() {
   var app = document.getElementById('admin-app');
   app.innerHTML = sidebarHtml('services')+topbarHtml('付费管理')+'<div class="admin-card"><div class="admin-card-title">付费服务项目</div>'+
     '<div style="margin-bottom:12px;display:flex;gap:8px;"><button class="btn-admin btn-admin-primary" id="btn-new-service">+ 新建服务</button></div>'+
-    '<div id="services-list"><div class="chart-placeholder">加载中...</div></div></div></div>'+
-    '<div class="admin-card" style="margin-top:16px;"><div class="admin-card-title">课程项目</div>'+
-    '<div style="margin-bottom:12px;display:flex;gap:8px;"><button class="btn-admin btn-admin-primary" id="btn-new-course">+ 新建课程</button></div>'+
-    '<div id="courses-list"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
+    '<div id="services-list"><div class="chart-placeholder">加载中...</div></div></div></div>';
   setupNav();
   document.getElementById('btn-new-service').onclick = showNewServiceForm;
   loadServices();
@@ -377,9 +373,6 @@ async function deleteService(id) {
 }
 
 
-// 新建课程按钮事件（在服务页面上）
-// 注意：btn-new-course 和 courses-list 现在位于付费管理页面
-// 使用 delegating init
 // Coins management page
 pages.coins = async function() {
   var app = document.getElementById('admin-app');
@@ -458,94 +451,5 @@ pages.data = async function() {
   window._dataRefresh = setInterval(loadLiveData, 5000);
 };
 
-
-
-function showNewCourseForm() {
-  document.getElementById('courses-list').innerHTML = '<div class="admin-card" style="padding:0;border:2px solid var(--primary);"><div style="padding:16px;"><h3 style="margin-bottom:12px;">新建课程</h3>'+
-    '<div class="form-group"><label>课程名称</label><input id="course-name" placeholder="如：太极拳基础班" /></div>'+
-    '<div class="form-row-grid"><div class="form-group"><label>费用 (健康币)</label><input id="course-price" type="number" placeholder="如：50" /></div>'+
-    '<div class="form-group"><label>人数上限</label><input id="course-max" type="number" placeholder="如：20" value="20" /></div></div>'+
-    '<div class="form-group"><label>课程描述</label><textarea id="course-desc" rows="2" placeholder="课程内容简介"></textarea></div>'+
-    '<div style="display:flex;gap:8px;margin-top:12px;"><button class="btn-admin btn-admin-primary" id="course-save-btn">保存</button>'+
-    '<button class="btn-admin btn-admin-secondary" id="course-cancel-btn">取消</button></div></div></div>';
-  document.getElementById('course-save-btn').onclick = async function(){
-    var name = document.getElementById('course-name').value.trim();
-    var price = document.getElementById('course-price').value;
-    if(!name||!price){toast('请填写名称和费用');return;}
-    var desc = document.getElementById('course-desc').value.trim();
-    var maxP = parseInt(document.getElementById('course-max').value)||20;
-    var res = await fetch('/api/course/create',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer admin-'+btoa('admin')},body:JSON.stringify({name:name,price:price,description:desc,maxParticipants:maxP})});
-    var d = await res.json();
-    if(d.ok){toast('课程已创建');loadCourses();}else{toast('失败: '+(d.error||''));}
-  };
-  document.getElementById('course-cancel-btn').onclick = loadCourses;
-}
-
-// 课程管理（已合并到付费管理页面）
-async function loadCourses() {
-  var d = await fetch('/api/courses',{headers:{Authorization:'Bearer admin-'+btoa('admin')}}).then(function(r){return r.json();});
-  if(d.data&&d.data.length) {
-    var html = '<table class="admin-table"><tr><th>名称</th><th>费用</th><th>已报名/上限</th><th>状态</th><th>操作</th></tr>'+
-      d.data.map(function(c){
-        return '<tr><td>'+esc(c.name)+'</td><td>'+c.price+' 币</td><td>'+(c.enrolled||0)+' / '+c.maxParticipants+'</td><td>'+(c.active===false?'<span style="color:red;">已下架</span>':'<span style="color:green;">上架中</span>')+'</td><td><button class="btn-admin btn-admin-sm btn-admin-danger del-course" data-id="'+c.id+'">删除</button></td></tr>';
-      }).join('')+'</table>';
-    document.getElementById('courses-list').innerHTML = html;
-    document.querySelectorAll('.del-course').forEach(function(el){
-      el.onclick = async function(){
-        if(!confirm('确定删除该课程？')) return;
-        var r = await fetch('/api/course/delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer admin-'+btoa('admin')},body:JSON.stringify({id:el.dataset.id})});
-        var d2 = await r.json();
-        if(d2.ok){toast('已删除');loadCourses();}else{toast('失败');}
-      };
-    });
-  } else {
-    document.getElementById('courses-list').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无课程，点击上方按钮创建</div>';
-  }
-}
-
-
-async function loadLiveData() {
-  var d = await api('GET','/users');
-  if(!d.data || !d.data.length) {
-    document.getElementById('live-monitor').innerHTML = '<div class="chart-placeholder">暂无用户数据</div>';
-    return;
-  }
-  var html = '<table class="admin-table"><tr><th>手机号</th><th>姓名</th><th>心率</th><th>血压</th><th>血氧</th><th>血糖</th><th>步数</th><th>睡眠</th><th>更新时间</th></tr>'+
-    d.data.map(function(u){
-      var p = {}; try{p=JSON.parse(u.data&&u.data.profile||'{}');}catch(e){}
-      var h = {}; try{h=JSON.parse(u.data&&u.data.healthData||'{}');}catch(e){}
-      var time = u.updatedAt ? new Date(u.updatedAt).toLocaleString('zh-CN') : '-';
-      var hrClass = (h.heartRate && (h.heartRate<60||h.heartRate>100)) ? ' style="color:red;font-weight:600;"' : '';
-      return '<tr><td>'+esc(u.phone)+'</td><td>'+esc(p.name||'-')+'</td><td'+hrClass+'>'+(h.heartRate||'-')+'</td><td>'+(h.bloodPressure||'-')+'</td><td>'+(h.bloodOxygen||'-')+'</td><td>'+(h.bloodSugar||'-')+'</td><td>'+(h.steps||'-')+'</td><td>'+(h.sleepHours||'-')+'h</td><td style="font-size:12px;color:var(--gray);">'+time+'</td></tr>';
-    }).join('')+'</table>'+
-    '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:right;">共 '+d.data.length+' 条记录 | 自动刷新中...</div>';
-  document.getElementById('live-monitor').innerHTML = html;
-};
-
-async function exportData() {
-  var d = await api('GET','/users');
-  var result = await api('POST','/export-report',{users:d.data||[]});
-  if(result.ok) {
-    document.getElementById('report-output').innerHTML = '<div class="badge badge-green" style="font-size:13px;padding:8px 12px;">✅ 报告已生成</div><div style="margin-top:8px;font-size:13px;background:#f9fafb;padding:10px;border-radius:8px;white-space:pre-wrap;font-family:monospace;">'+esc(result.report)+'</div>';
-  } else {
-    document.getElementById('report-output').innerHTML = '<div style="color:red;">导出失败</div>';
-  }
-}
-
-window.addEventListener('hashchange', function(){
-  var info = getPath();
-  if(pages[info.path]) pages[info.path](info.params);
-});
-window.addEventListener('DOMContentLoaded', function(){
-  var saved = localStorage.getItem('adminUser');
-  if(saved) {
-    adminUser=saved;
-    var info = getPath();
-    if(!location.hash||location.hash==='#/'){navigate('dashboard');}
-    else if(pages[info.path]){pages[info.path](info.params);}
-  } else {
-    navigate('login');
-  }
-});
 
 
