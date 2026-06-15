@@ -1,4 +1,4 @@
-const API = 'http://localhost:3000/api/admin';
+﻿const API = 'http://localhost:3000/api/admin';
 var adminUser = null;
 
 function esc(s) {
@@ -547,3 +547,4 @@ window.addEventListener('DOMContentLoaded', function(){
     navigate('login');
   }
 });
+
