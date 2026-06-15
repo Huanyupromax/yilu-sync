@@ -135,7 +135,7 @@ pages.users = async function() {
   var d = await api('GET','/users');
   if(d.data&&d.data.length) {
     var rows = d.data.map(function(u){
-      var p={};try{p=JSON.parse(u.data&&u.data.profile||'{}');}catch(e){}
+      var p=u.data&&u.data.profile||'{}';if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}}
       return '<tr><td>'+esc(u.phone)+'</td><td>'+roleBadge(u.role)+'</td><td>'+esc(p.name||'-')+'</td><td>'+(u.updatedAt?new Date(u.updatedAt).toLocaleString('zh-CN'):'-')+'</td><td><button class="btn-admin btn-admin-sm btn-admin-primary vu" data-p="'+esc(u.phone)+'">查看</button></td></tr>';
     }).join('');
     document.getElementById('user-list').innerHTML = '<table class="admin-table"><tr><th>手机号</th><th>身份</th><th>资料</th><th>注册时间</th><th>操作</th></tr>'+rows+'</table>';
@@ -156,9 +156,9 @@ pages['user-detail'] = async function(params) {
   var d = await api('GET','/users/'+encodeURIComponent(phone));
   if(d.error){document.getElementById('user-detail-content').innerHTML='<div class="admin-card" style="color:red;">'+esc(d.error)+'</div>';return;}
   var u=d.user;
-  var p={};try{p=JSON.parse(u.data&&u.data.profile||'{}');}catch(e){}
-  var h={};try{h=JSON.parse(u.data&&u.data.healthData||'{}');}catch(e){}
-  var sh=[];try{sh=JSON.parse(u.data&&u.data.signHistory||'[]');}catch(e){}
+  var p=u.data&&u.data.profile||'{}';if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}}
+  var h=u.data&&u.data.healthData||'{}';if(typeof h==='string'){try{h=JSON.parse(h);}catch(e){h={};}}
+  var sh=u.data&&u.data.signHistory||'[]';if(typeof sh==='string'){try{sh=JSON.parse(sh);}catch(e){sh=[];}}
   document.getElementById('user-detail-content').innerHTML =
     '<div class="admin-card"><div class="admin-card-title">基本信息</div><div class="detail-grid">'+
     '<div class="detail-item"><div class="detail-label">手机号</div><div class="detail-value">'+esc(phone)+'</div></div>'+
@@ -212,7 +212,7 @@ async function loadAllRx() {
   for(var i=0;i<d.data.length;i++) {
     var u=d.data[i];
     var rxData = await api('GET','/prescription/'+encodeURIComponent(u.phone));
-    var p={};try{p=JSON.parse(u.data&&u.data.profile||'{}');}catch(e){}
+    var p=u.data&&u.data.profile||'{}';if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}}
     if(rxData.data&&rxData.data.items) {
       html+='<div class="rx-card"><div class="rx-header"><div class="rx-doctor">'+esc(p.name||u.phone)+'</div><div class="rx-date">'+new Date(rxData.data.createdAt).toLocaleDateString('zh-CN')+'</div></div>'+
         '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">医生: '+esc(rxData.data.doctor||'-')+'</div>'+
@@ -245,7 +245,7 @@ pages['prescription-new'] = async function(params) {
     var sel = document.getElementById('rx-phone');
     if(!phone) {
       d.data.forEach(function(u){
-        var p={};try{p=JSON.parse(u.data&&u.data.profile||'{}');}catch(e){}
+        var p=u.data&&u.data.profile||'{}';if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}}
         sel.innerHTML+='<option value="'+esc(u.phone)+'">'+esc(p.name||u.phone)+' ('+esc(u.phone)+')</option>';
       });
     }
@@ -263,7 +263,7 @@ async function generatePrescription() {
   if(!phone){toast('请选择用户');return;}
   document.getElementById('rx-result').innerHTML = '<div class="chart-placeholder">🔄 正在智能计算处方...</div>';
   var userData = await api('GET','/users/'+encodeURIComponent(phone));
-  var p={};try{p=userData.user&&userData.user.data?JSON.parse(userData.user.data.profile||'{}'):{};}catch(e){}
+  var p={};try{p=userData.user&&userData.user.data?JSON.parse(userData.user.data.profile||'{}'):{};}catch(e){p={};}if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={};}}
   var body = {
     phone:phone,
     profile:{age:parseInt(p.age)||65,weight:p.weight||'65',height:p.height||'165',hasChronic:!!p.hasChronic,name:p.name||''},
