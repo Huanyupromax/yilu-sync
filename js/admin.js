@@ -451,5 +451,53 @@ pages.data = async function() {
   window._dataRefresh = setInterval(loadLiveData, 5000);
 };
 
+// ========== 初始化 ==========
+function init() {
+  // Load admin user from localStorage
+  var saved = localStorage.getItem('adminUser');
+  if (saved) {
+    adminUser = saved;
+    navigate('dashboard');
+  } else {
+    navigate('login');
+  }
+}
 
+// Handle hash changes
+window.addEventListener('hashchange', function() {
+  var hash = location.hash.slice(1);
+  if (hash === '' || hash === '/login') {
+    // Check login status
+    var saved = localStorage.getItem('adminUser');
+    if (saved) {
+      adminUser = saved;
+      navigate('dashboard');
+    } else {
+      navigate('login');
+    }
+    return;
+  }
+  var parts = hash.slice(1).split('?');
+  var path = parts[0];
+  var params = {};
+  if (parts[1]) {
+    parts[1].split('&').forEach(function(kv) {
+      var p = kv.split('=');
+      params[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
+    });
+  }
+  var fn = pages[path];
+  if (fn) {
+    var app = document.getElementById('admin-app');
+    if (app) fn(app, params);
+  } else {
+    navigate('dashboard');
+  }
+});
 
+// Start the app when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
