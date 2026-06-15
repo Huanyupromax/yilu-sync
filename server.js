@@ -721,6 +721,25 @@ app.get('/api/admin/courses', adminAuth, async (req, res) => { try { const c = a
 app.post('/api/admin/course/delete', adminAuth, async (req, res) => { try { const { id } = req.body; if (!id) return res.status(400).json({ error: '缺少课程ID' }); await coursesCollection.deleteOne({ id: id }); res.json({ ok: true }); } catch (err) { res.status(500).json({ error: err.message }); } });
 app.get('/api/courses', async (req, res) => { try { const c = await coursesCollection.find({ active: { $ne: false } }).toArray(); res.json({ data: c }); } catch (err) { res.status(500).json({ error: err.message }); } });
 // 子女端为老人购买课程
+app.post('/api/course/create', async (req, res) => {
+  try {
+    const { name, price, description, maxParticipants } = req.body;
+    if (!name) return res.status(400).json({ error: '缺少课程名称' });
+    const id = 'course_' + Date.now();
+    await coursesCollection.insertOne({ id, name, price: parseInt(price) || 0, description: description || '', maxParticipants: parseInt(maxParticipants) || 20, enrolled: 0, active: true, createdAt: new Date().toISOString() });
+    res.json({ ok: true, id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/course/delete', async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: '缺少课程ID' });
+    await coursesCollection.deleteOne({ id });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/course/purchase-for-elderly', auth, async (req, res) => {
   try {
     const { courseId, elderlyPhone } = req.body;
@@ -737,11 +756,39 @@ app.post('/api/course/purchase-for-elderly', auth, async (req, res) => {
     if (userCoins < course.price) return res.status(400).json({ error: '健康币不足' });
     await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -course.price }, $set: { updatedAt: new Date() } });
     await usersCollection.updateOne({ phone: elderlyPhone }, { $push: { purchasedCourses: courseId }, $set: { updatedAt: new Date() } });
+    // Record child's purchase
+    await usersCollection.updateOne({ phone: req.phone }, { $push: { elderlyPurchases: { elderlyPhone, courseName: course.name, courseId, time: new Date().toISOString() } } });
     await coursesCollection.updateOne({ id: courseId }, { $inc: { enrolled: 1 } });
     res.json({ ok: true, message: '购买成功', coinsLeft: (userCoins - course.price) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+app.get('/api/my-elderly-purchases', auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.phone });
+    if (!user || !user.elderlyPurchases) return res.json({ data: [] });
+    res.json({ data: user.elderlyPurchases });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.get('/api/my-courses', auth, async (req, res) => { try { const user = await usersCollection.findOne({ phone: req.phone }); if (!user || !user.purchasedCourses) return res.json({ data: [] }); const my = await coursesCollection.find({ id: { $in: user.purchasedCourses } }).toArray(); res.json({ data: my }); } catch (err) { res.status(500).json({ error: err.message }); } });
+
+// Elderly dashboard for children
+app.get('/api/elderly/dashboard/:phone', auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.params.phone });
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const profile = user.data && user.data.profile || {};
+    const healthData = user.data && user.data.healthData || {};
+    const dailyRecords = user.data && user.data.dailyRecords || {};
+    const today = new Date().toISOString().slice(0,10);
+    const todayRecord = dailyRecords[today] || {};
+    const courses = user.purchasedCourses ? await coursesCollection.find({ id: { $in: user.purchasedCourses } }).toArray() : [];
+    // Return recent records (last 7 days)
+    const dates = Object.keys(dailyRecords).sort().slice(-7);
+    const recentRecords = {};
+    dates.forEach(function(date){ recentRecords[date] = dailyRecords[date]; });
+    res.json({ ok: true, name: profile.name || user.phone, phone: user.phone, healthData, todayRecord, recentRecords, courses });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
