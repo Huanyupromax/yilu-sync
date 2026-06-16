@@ -992,6 +992,56 @@ app.post('/api/admin/withdrawal/process', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+// ── 医师端智能处方生成 ──
+app.post('/api/doctor/generate-prescription', auth, async (req, res) => {
+  try {
+    const { patientPhone } = req.body;
+    if (!patientPhone) return res.status(400).json({ error: '缺少患者手机号' });
+    const patient = await usersCollection.findOne({ phone: patientPhone });
+    if (!patient) return res.status(404).json({ error: '未找到患者' });
+    const profile = patient.data?.profile || {};
+    const healthData = patient.data?.dailyRecords || {};
+    const today = new Date().toISOString().slice(0,10);
+    const h = healthData[today] || {};
+    const age = parseInt(profile.age) || 65;
+    const hasChronic = !!profile.hasChronic;
+    const hr = parseInt(h.heartRate) || 75;
+    const ox = parseInt(h.bloodOxygen) || 97;
+    const sugar = parseFloat(h.bloodSugar) || 5.5;
+    const weight = parseFloat(profile.weight) || 65;
+    const height = parseFloat(profile.height) || 165;
+    const bmi = weight / ((height/100)*(height/100));
+    const maxHR = 220 - age;
+    const targetHR = Math.round(hasChronic ? maxHR*0.6 : maxHR*0.75);
+    let score = 0;
+    if (hr>=60&&hr<=80) score+=3; else if (hr>=50&&hr<=100) score+=1;
+    if (ox>=96) score+=3; else if (ox>=93) score+=1;
+    if (sugar>=3.9&&sugar<=6.1) score+=2; else if (sugar<=7.0) score+=1;
+    const bps = parseInt((h.bloodPressure||'/').split('/')[0])||120;
+    if (bps>=90&&bps<=130) score+=3; else if (bps<=140) score+=1;
+    if (bmi>=18.5&&bmi<=24.9) score+=2; else if (bmi<=29.9) score+=1;
+    if (hasChronic) score-=2;
+    const level = score>=10?'良好':score>=6?'一般':'需关注';
+    const exercises=[];
+    exercises.push({name:'热身运动',icon:'🏃',detail:'关节活动+慢走5-10分钟'});
+    if(level==='良好'){exercises.push({name:'快走',icon:'🚶',detail:'4-5km/h，20-30分钟'});exercises.push({name:'太极拳',icon:'🥋',detail:'24式太极拳，15-20分钟'});exercises.push({name:'八段锦',icon:'🧘',detail:'完整八段锦一套，15分钟'});}
+    else if(level==='一般'){exercises.push({name:'慢走',icon:'🚶',detail:'3-4km/h，15-20分钟'});exercises.push({name:'伸展运动',icon:'🙆',detail:'全身拉伸，10-15分钟'});exercises.push({name:'坐姿运动',icon:'🧘',detail:'坐姿抬腿+手臂运动，10分钟'});}
+    else{exercises.push({name:'床边活动',icon:'🛏️',detail:'坐起、抬腿，5-10分钟'});exercises.push({name:'呼吸训练',icon:'🫁',detail:'腹式呼吸，5-10分钟'});}
+    const freq = level==='良好'?'每周5-6次':level==='一般'?'每周3-4次':'每周2-3次';
+    const dur = level==='良好'?'30-45分钟/次':level==='一般'?'20-30分钟/次':'10-15分钟/次';
+    const cautions = hasChronic?'注意监测心率，不超过'+targetHR+'次/分。如有不适应立即停止。':'运动前热身5分钟，运动后拉伸。循序渐进，量力而行。';
+    res.json({ ok: true, prescription: {
+      doctor: profile.name || '医师', hospital: '平台医师', date: today,
+      age, hasChronic, bmi: Math.round(bmi*10)/10,
+      healthScore: score, healthLevel: level,
+      maxHeartRate: targetHR,
+      intensity: level==='良好'?'中等强度':level==='一般'?'低强度':'极低强度',
+      items: exercises, frequency: freq, duration: dur,
+      cautions, dietAdvice: '均衡饮食，多摄入蛋白质和膳食纤维'
+    }});
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

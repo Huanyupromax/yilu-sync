@@ -425,7 +425,7 @@ PAGES.sport = (app) => {
             </div>
             <div class="grid-2">
                 <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看用户数据</div></div>
-                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
+                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
             </div>
             <div class="card"><div class="card-title">最近联系的患者</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">暂无记录</div></div></div>
         </div>`;
@@ -2031,6 +2031,114 @@ async function loadWithdrawals() {
             container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无提现记录</div>';
         }
     } catch(e){}
+}
+
+
+// ── 智能处方生成页面 ──
+PAGES['ai-prescription'] = (app) => {
+    setNavTitle('智能处方生成');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">智能处方生成</div><div class="header-subtitle">输入患者手机号，AI自动生成运动处方</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="ai-patient-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="ai-search-btn" style="padding:6px 12px;">搜索</button></div>
+                <div id="ai-patient-info"></div>
+            </div>
+            <div id="ai-form" style="display:none;">
+                <div class="card"><div class="card-title">健康评估</div><div id="ai-health-summary"></div></div>
+                <button class="btn btn-primary btn-block" id="ai-generate-btn">🤖 智能生成处方</button>
+                <div id="ai-result" class="card" style="display:none;"><div class="card-title">生成的处方</div><div id="ai-prescription-content"></div>
+                <button class="btn btn-primary btn-block" id="ai-send-btn" style="margin-top:8px;">📤 发送处方到患者</button></div>
+            </div>
+        </div>`;
+    
+    var currentPatientPhone = '';
+    
+    app.querySelector('#ai-search-btn').onclick = function(){
+        var phone = app.querySelector('#ai-patient-input').value.trim();
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">搜索中...</div>';
+        fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone),{headers:{Authorization:'Bearer '+currentUser.token}})
+            .then(function(r){return r.json();})
+            .then(function(d){
+                if(d.patient){
+                    currentPatientPhone = d.patient.phone;
+                    var records = d.dailyRecords || {};
+                    var today = new Date().toISOString().slice(0,10);
+                    var h = records[today] || {};
+                    app.querySelector('#ai-patient-info').innerHTML = '<div class="form-row" style="border:1px solid var(--orange-light);border-radius:8px;padding:10px;margin-top:8px;"><div class="avatar orange">👤</div><div style="flex:1;"><div style="font-weight:600;font-size:16px;">'+escapeHtml(d.patient.name||'未命名')+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+'</div></div></div>';
+                    app.querySelector('#ai-form').style.display = 'block';
+                    app.querySelector('#ai-health-summary').innerHTML = `
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                            <div class="info-pill green"><div class="fs-28 fw-600">${h.heartRate||'--'}</div><div style="font-size:12px;">心率</div></div>
+                            <div class="info-pill orange"><div class="fs-28 fw-600">${h.bloodPressure||'--'}</div><div style="font-size:12px;">血压</div></div>
+                            <div class="info-pill purple"><div class="fs-28 fw-600">${h.bloodOxygen||'--'}</div><div style="font-size:12px;">血氧</div></div>
+                            <div class="info-pill blue"><div class="fs-28 fw-600">${h.bloodSugar||'--'}</div><div style="font-size:12px;">血糖</div></div>
+                        </div>
+                        <div style="font-size:13px;color:var(--gray);">以上健康数据来自患者今日上传记录</div>`;
+                } else {
+                    app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该用户</div>';
+                }
+            })
+            .catch(function(){ app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">搜索失败</div>'; });
+    };
+    
+    app.querySelector('#ai-generate-btn').onclick = async function(){
+        if(!currentPatientPhone){ toast('请先搜索患者'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#ai-generate-btn').textContent = '⏳ 生成中...';
+        app.querySelector('#ai-generate-btn').disabled = true;
+        try {
+            var res = await fetch(API_BASE+'/api/doctor/generate-prescription', {
+                method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                body:JSON.stringify({patientPhone:currentPatientPhone})
+            });
+            var d = await res.json();
+            if(d.ok && d.prescription){
+                var rx = d.prescription;
+                var itemsHtml = (rx.items||[]).map(function(i){ return '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);margin-bottom:6px;"><div style="font-weight:600;">'+escapeHtml(i.icon)+' '+escapeHtml(i.name)+'</div><div style="font-size:14px;color:var(--gray);">'+escapeHtml(i.detail)+'</div></div>'; }).join('');
+                app.querySelector('#ai-prescription-content').innerHTML = `
+                    <div style="margin-bottom:8px;"><span class="badge" style="color:${rx.healthLevel==='良好'?'green':rx.healthLevel==='一般'?'orange':'red'};">健康等级: ${rx.healthLevel} (${rx.healthScore}分)</span></div>
+                    <div style="margin-bottom:8px;"><strong>限制心率:</strong> ≤ ${rx.maxHeartRate} 次/分</div>
+                    <div style="margin-bottom:8px;"><strong>频率:</strong> ${rx.frequency} | <strong>时长:</strong> ${rx.duration}</div>
+                    <div style="margin-bottom:8px;"><strong>强度:</strong> ${rx.intensity}</div>
+                    <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
+                    ${itemsHtml}
+                    <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
+                    <div style="margin-bottom:8px;"><strong>注意事项:</strong> ${escapeHtml(rx.cautions)}</div>
+                    <div><strong>营养建议:</strong> ${escapeHtml(rx.dietAdvice)}</div>`;
+                app.querySelector('#ai-result').style.display = 'block';
+                toast('处方生成成功');
+            } else {
+                toast(d.error||'生成失败');
+            }
+        } catch(e){ toast('网络错误'); }
+        app.querySelector('#ai-generate-btn').textContent = '🤖 智能生成处方';
+        app.querySelector('#ai-generate-btn').disabled = false;
+    };
+    
+    app.querySelector('#ai-send-btn').onclick = async function(){
+        if(!currentPatientPhone || !currentUser){ toast('请先完成搜索和生成'); return; }
+        var rxContent = app.querySelector('#ai-prescription-content').innerHTML;
+        var items = [];
+        app.querySelectorAll('#ai-prescription-content .prescription-box').forEach(function(el){
+            var parts = el.querySelectorAll('div');
+            if(parts.length >= 2){
+                items.push({name: parts[0].textContent.replace(/[🥋🚶🧘🙆🛏️🫁🏃]/g,'').trim(), detail: parts[1].textContent.trim()});
+            }
+        });
+        app.querySelector('#ai-send-btn').textContent = '⏳ 发送中...';
+        try {
+            var res = await fetch(API_BASE+'/api/doctor/send-prescription', {
+                method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                body:JSON.stringify({patientPhone:currentPatientPhone, prescription:{items:items, doctor:'智能生成', date:new Date().toISOString().slice(0,10)}, doctorNotes:'智能处方生成'})
+            });
+            var d = await res.json();
+            if(d.ok){ toast('处方已发送到患者'); } else toast(d.error||'发送失败');
+        } catch(e){ toast('网络错误'); }
+        app.querySelector('#ai-send-btn').textContent = '📤 发送处方到患者';
+    };
 }
 // ========== 初始化 ==========
 
