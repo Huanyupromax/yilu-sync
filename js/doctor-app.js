@@ -210,10 +210,11 @@ function logout() {
 }
 
 // ========== 路由 ==========
-const TABBAR_PAGES = ['home', 'sport', 'data', 'messages', 'me'];
+const TABBAR_PAGES = ['home', 'sport', 'prescription', 'data', 'messages', 'me'];
 const TABBAR_LIST = [
     { key: 'home', text: '工作台', icon: '💼' },
     { key: 'sport', text: '患者', icon: '👥' },
+    { key: 'prescription', text: '处方', icon: '📋' },
     { key: 'data', text: '数据', icon: '📈' },
     { key: 'messages', text: '消息', icon: '💬' },
     { key: 'me', text: '我的', icon: '👤' }
@@ -1365,12 +1366,16 @@ PAGES.assistant = (app) => {
 
 // 原有其他页面（prescription, courses, emergency, monitor, coin, report, profile-setup, me）
 PAGES.prescription = (app) => {
-    setNavTitle('运动方案');
-    let rx = storage.getPrescription();
-    if (!rx) { rx = storage.generatePrescription(storage.getProfile()); storage.setPrescription(rx); }
-    app.innerHTML = `<div class="container"><div class="card"><div class="row"><div class="avatar orange">🥗</div><div><div class="fs-36 fw-600">${escapeHtml(rx.doctor)}</div><div class="text-muted">${escapeHtml(rx.hospital)}</div></div></div></div>
-        <div class="card"><div class="card-title">运动方案</div><div class="prescription-box"><div>限制心率：≤ ${rx.maxHeartRate} 次/分</div><div>推荐项目：${(rx.items || []).join('、')}</div><div>频率：${rx.frequency}</div><div>时长：${rx.duration}</div><div>强度：${rx.intensity}</div><div>注意事项：${rx.cautions}</div></div></div>
-        <div class="card"><button class="btn btn-primary btn-block" data-go="sport">按方案开始运动</button><button class="btn btn-ghost btn-block" data-go="courses">预约线下课程</button></div></div>`;
+    setNavTitle('处方管理');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">处方管理</div><div class="header-subtitle">管理患者运动处方</div></div></div>
+            <div class="grid-2">
+                <div class="feature-tile orange" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
+                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看患者数据</div></div>
+            </div>
+            <div class="card"><div class="card-title">已发送的处方</div><div id="sent-prescriptions"><div class="text-muted" style="text-align:center;padding:12px;">暂无已发送的处方记录</div></div></div>
+        </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
 };
 PAGES.courses = (app) => {
