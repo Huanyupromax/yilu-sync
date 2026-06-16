@@ -482,6 +482,9 @@ async function loadDashData(app) {
         var records = d.dailyRecords || {};
         var today = new Date().toISOString().slice(0,10);
         var h = records[today] || {};
+    // Normalize elderly端 field names
+    if(h.bp && !h.bloodPressure) h.bloodPressure = h.bp;
+    if(h.sleep && !h.sleepHours) h.sleepHours = h.sleep;
         var name = d.patient.name || '未设置';
         var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">👤</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(name)+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+' · 今日健康数据</div></div></div></div>';
         html += '<div class="card" style="margin-bottom:8px;"><div class="card-title">📊 今日健康指标</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
