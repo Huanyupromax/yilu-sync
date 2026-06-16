@@ -106,6 +106,8 @@ pages.dashboard = async function() {
   var app = document.getElementById('admin-app');
   app.innerHTML = sidebarHtml('dashboard')+topbarHtml('数据概览')+'<div class="stats-grid" id="stats-grid"></div><div class="admin-card"><div class="admin-card-title">最近注册用户</div><div id="recent-users"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
   setupNav();
+  loadLiveData();
+  setInterval(loadLiveData, 5000);
   var stats = await api('GET','/stats');
   var grid = '';
   var items = [
@@ -454,6 +456,19 @@ pages.data = async function() {
   window._dataRefresh = setInterval(loadLiveData, 5000);
 };
 
+async function loadLiveData() {
+  var d = await api('GET', '/live-data');
+  if(d.data && d.data.length) {
+    var html = '<table class="admin-table"><tr><th>手机号</th><th>日期</th><th>心率</th><th>血压</th><th>血氧</th><th>血糖</th><th>步数</th><th>睡眠</th></tr>'+
+      d.data.map(function(u){
+        var r = u.record || {};
+        return '<tr><td>'+esc(u.phone)+'</td><td>'+(u.date||'-')+'</td><td>'+(r.heartRate||'-')+'</td><td>'+(r.bloodPressure||'-')+'</td><td>'+(r.bloodOxygen||'-')+'</td><td>'+(r.bloodSugar||'-')+'</td><td>'+(r.steps||'-')+'</td><td>'+(r.sleepHours||'-')+'</td></tr>';
+      }).join('')+'</table>';
+    document.getElementById('live-monitor').innerHTML = html;
+  } else {
+    document.getElementById('live-monitor').innerHTML = '<div class="chart-placeholder">暂无用户上传健康数据</div>';
+  }
+}
 
 pages.qualifications = async function() {
   var app = document.getElementById('admin-app');

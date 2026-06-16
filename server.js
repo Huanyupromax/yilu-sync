@@ -1197,6 +1197,23 @@ app.post('/api/admin/qualification/review', adminAuth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 管理端实时健康数据 ──
+app.get('/api/admin/live-data', adminAuth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const users = await usersCollection.find({}).toArray();
+    var result = [];
+    users.forEach(function(u){
+      var records = u.data?.dailyRecords || {};
+      var todayData = records[today] || {};
+      if(Object.keys(todayData).length > 0){
+        result.push({ phone: u.phone, date: today, record: todayData });
+      }
+    });
+    res.json({ data: result });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
