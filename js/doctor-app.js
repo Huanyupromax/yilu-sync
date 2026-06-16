@@ -633,6 +633,16 @@ PAGES['doctor-patient-data'] = (app, params) => {
 
 PAGES['doctor-send-prescription'] = (app) => {
     setNavTitle('发送运动处方');
+    if(currentUser){
+        fetch(API_BASE+'/api/qualification/certified',{headers:{Authorization:'Bearer '+currentUser.token}})
+            .then(function(r){return r.json();})
+            .then(function(d){
+                if(!d.certified){
+                    app.innerHTML = '<div class="container"><div class="card" style="text-align:center;padding:30px;"><div style="font-size:48px;margin-bottom:12px;">\uD83D\uDD12</div><div style="font-size:18px;font-weight:600;margin-bottom:8px;">未完成资质认证</div><div style="color:var(--gray);margin-bottom:20px;">您需要上传执业医师证或相关资质证书，经管理员审核后方可给患者开方</div><button class="btn btn-primary" onclick="navigate(\'qualifications\')">去认证</button><button class="btn btn-ghost" onclick="navigate(\'home\')">返回</button></div></div>';
+                }
+            });
+    }
+    setNavTitle('发送运动处方');
     var selectedPatientPhone = '';
     var selectedPatientName = '';
     var items = [{icon:'🏃',name:'',detail:''}];
@@ -1866,6 +1876,84 @@ PAGES.me = (app) => {
     app.querySelector('#logout-btn').onclick = logout;
 };
 
+
+
+// ── 资质管理页面 ──
+PAGES.qualifications = (app) => {
+    setNavTitle('资质管理');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">资质管理</div><div class="header-subtitle">上传专业资质文件，审核后可开方</div></div></div>
+            <div class="card"><div class="card-title">上传资质</div>
+                <div class="form-group"><label>资质类型</label>
+                    <select id="qual-type" class="form-input">
+                        <option value="doctor_cert">执业医师证</option>
+                        <option value="nutritionist_cert">营养师资格证</option>
+                        <option value="title_cert">职称证明</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>选择文件（图片）</label>
+                    <input type="file" id="qual-file" accept="image/*" style="padding:8px;border:1px solid #ddd;border-radius:8px;width:100%;" />
+                </div>
+                <div id="qual-preview" style="display:none;margin-bottom:8px;"></div>
+                <button class="btn btn-primary btn-block" id="qual-upload-btn">上传资质</button>
+                <div id="qual-upload-result"></div>
+            </div>
+            <div class="card"><div class="card-title">我的资质</div><div id="qual-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+        </div>`;
+    
+    loadQualList();
+    
+    document.getElementById('qual-file').onchange = function() {
+        var file = this.files[0];
+        if(!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('qual-preview').style.display = 'block';
+            document.getElementById('qual-preview').innerHTML = '<img src="'+e.target.result+'" style="max-width:100%;max-height:200px;border-radius:8px;" />';
+        };
+        reader.readAsDataURL(file);
+    };
+    
+    document.getElementById('qual-upload-btn').onclick = async function() {
+        var type = document.getElementById('qual-type').value;
+        var labels = { doctor_cert:'执业医师证', nutritionist_cert:'营养师资格证', title_cert:'职称证明' };
+        var input = document.getElementById('qual-file');
+        if(!input.files[0]){ toast('请选择文件'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        var reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                var res = await fetch(API_BASE+'/api/qualification/upload', {
+                    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                    body:JSON.stringify({ type, typeLabel:labels[type], fileName:input.files[0].name, fileData:e.target.result })
+                });
+                var d = await res.json();
+                if(d.ok){ toast('上传成功'); loadQualList(); }else toast(d.error||'上传失败');
+            } catch(e2){ toast('网络错误'); }
+        };
+        reader.readAsDataURL(input.files[0]);
+    };
+};
+
+async function loadQualList() {
+    if(!currentUser){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">请先登录</div>'; return; }
+    try {
+        var res = await fetch(API_BASE+'/api/qualification/my',{headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.data && d.data.length){
+            document.getElementById('qual-list').innerHTML = d.data.map(function(q){
+                var badge = q.status==='approved' ? '<span style="color:green;">\u2705 已通过</span>' :
+                    q.status==='rejected' ? '<span style="color:red;">\u274C 未通过'+(q.reviewNote?' - '+escapeHtml(q.reviewNote):'')+'</span>' :
+                    '<span style="color:orange;">\u23F3 审核中</span>';
+                return '<div style="border-bottom:1px solid #f0f0f0;padding:8px 0;"><div style="display:flex;align-items:center;gap:8px;"><span>\uD83D\uDCC4</span><div style="flex:1;"><div>'+escapeHtml(q.typeLabel)+'</div><div style="font-size:12px;color:var(--gray);">'+escapeHtml(q.fileName)+'</div></div>'+badge+'</div>'+
+                    (q.fileData ? '<div style="margin-top:4px;"><img src="'+q.fileData+'" style="max-width:100%;max-height:150px;border-radius:6px;" /></div>' : '')+'</div>';
+            }).join('');
+        } else {
+            document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无资质记录</div>';
+        }
+    } catch(e){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">加载失败</div>'; }
+}
 // ========== 初始化 ==========
 
 // ── 付费服务页面 ──

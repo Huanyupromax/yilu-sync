@@ -55,6 +55,7 @@ function sidebarHtml(current) {
     {key:'coins',icon:'🪙',label:'健康币管理'},
     {key:'activities',icon:'👨‍👩‍👧‍👦',label:'亲子活动'},
     {key:'volunteer',icon:'🤝',label:'志愿报名'},
+    {key:'qualifications',icon:'🎓',label:'资质审核'},
     {key:'data',icon:'📈',label:'健康数据'}
   ];
   var nav = items.map(function(i){
@@ -453,6 +454,43 @@ pages.data = async function() {
   window._dataRefresh = setInterval(loadLiveData, 5000);
 };
 
+
+pages.qualifications = async function() {
+  var app = document.getElementById('admin-app');
+  app.innerHTML = sidebarHtml('qualifications')+topbarHtml('资质审核')+'<div class="admin-card"><div class="admin-card-title">医师资质审核</div><div id="qual-list"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
+  setupNav();
+  loadAdminQualifications();
+};
+async function loadAdminQualifications() {
+  var d = await api('GET', '/qualifications');
+  if(d.data && d.data.length) {
+    var html = '<table class="admin-table"><tr><th>姓名</th><th>手机号</th><th>资质类型</th><th>文件</th><th>状态</th><th>上传时间</th><th>操作</th></tr>'+
+      d.data.map(function(q){
+        var imgHtml = q.fileData ? '<div style="max-width:150px;"><img src="'+q.fileData+'" style="max-width:100%;max-height:80px;border-radius:4px;cursor:pointer;" onclick="window.open(\''+q.fileData+'\')" /></div>' : '-';
+        var statusHtml = q.status==='approved' ? '<span style="color:green;font-weight:600;">已通过</span>' :
+          q.status==='rejected' ? '<span style="color:red;font-weight:600;">未通过</span>' : '<span style="color:orange;font-weight:600;">待审核</span>';
+        var actionHtml = q.status==='pending' ?
+          '<button class="btn-admin btn-admin-sm btn-admin-primary" onclick="reviewQual(\''+q.id+'\',\'approved\')">通过</button>'+
+          '<button class="btn-admin btn-admin-sm btn-admin-danger" onclick="reviewQual(\''+q.id+'\',\'rejected\')">拒绝</button>' :
+          (q.reviewNote ? '<span style="font-size:12px;color:var(--gray);">备注:'+esc(q.reviewNote)+'</span>' : '-');
+        return '<tr><td>'+esc(q.userName)+'</td><td>'+esc(q.phone)+'</td><td>'+esc(q.typeLabel)+'</td><td>'+imgHtml+'</td><td>'+statusHtml+'</td><td>'+(q.uploadedAt?new Date(q.uploadedAt).toLocaleString('zh-CN'):'-')+'</td><td style="white-space:nowrap;">'+actionHtml+'</td></tr>';
+      }).join('')+'</table>';
+    document.getElementById('qual-list').innerHTML = html;
+  } else {
+    document.getElementById('qual-list').innerHTML = '<div class="chart-placeholder">暂无资质申请</div>';
+  }
+}
+window.reviewQual = async function(id, status) {
+  if(status==='rejected'){
+    var note = prompt('请输入拒绝原因（可选）：');
+    if(note===null) return;
+    await api('POST', '/qualification/review', { id: id, status: status, reviewNote: note||'' });
+  } else {
+    await api('POST', '/qualification/review', { id: id, status: status });
+  }
+  toast('操作成功');
+  loadAdminQualifications();
+};
 // ========== 初始化 ==========
 function init() {
   // Load admin user from localStorage
