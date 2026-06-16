@@ -809,6 +809,24 @@ app.get('/api/elderly/dashboard/:phone', auth, async (req, res) => {
     res.json({ ok: true, name: profile.name || user.phone, phone: user.phone, healthData, todayRecord, recentRecords, courses });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+// 绑定/解绑老人
+app.post('/api/bind/elderly', auth, async (req, res) => {
+  try {
+    const { elderlyPhone } = req.body;
+    await usersCollection.updateOne({ phone: req.phone }, { $set: { boundElderlyPhone: elderlyPhone || '' } });
+    res.json({ ok: true, phone: elderlyPhone || '' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/bind/elderly', auth, async (req, res) => {
+  try {
+    const user = await usersCollection.findOne({ phone: req.phone }, { projection: { boundElderlyPhone: 1 } });
+    res.json({ ok: true, phone: (user && user.boundElderlyPhone) || '' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
