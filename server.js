@@ -805,7 +805,7 @@ app.get('/api/elderly/dashboard/:phone', auth, async (req, res) => {
     const todayRecord = dailyRecords[today] || {};
     const courses = user.purchasedCourses ? await coursesCollection.find({ id: { $in: user.purchasedCourses } }).toArray() : [];
     // Return recent records (last 7 days)
-    const dates = Object.keys(dailyRecords).sort().slice(-7);
+    const dates = Object.keys(dailyRecords).sort().slice(-30);
     const recentRecords = {};
     dates.forEach(function(date){ recentRecords[date] = dailyRecords[date]; });
     var rx = user.prescription ? JSON.parse(user.prescription) : null;
