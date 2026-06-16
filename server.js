@@ -967,9 +967,11 @@ app.post('/api/doctor/withdraw', auth, async (req, res) => {
     if (amt < 10) return res.status(400).json({ error: '最低提现10健康币' });
     const user = await usersCollection.findOne({ phone: req.phone });
     if ((user?.coins || 0) < amt) return res.status(400).json({ error: '健康币不足' });
-    const wd = { id: 'wd_' + Date.now(), phone: req.phone, amount: amt, method, account, status: 'pending', createdAt: new Date().toISOString(), processedAt: '' };
+    // Deduct immediately and record as approved
+    await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: -amt, doctorWithdrawn: amt }, $push: { coinRecords: { type: 'withdraw', amount: -amt, method: method, time: new Date().toISOString() } } });
+    const wd = { id: 'wd_' + Date.now(), phone: req.phone, amount: amt, method, account, status: 'approved', createdAt: new Date().toISOString(), processedAt: new Date().toISOString() };
     await withdrawalsCollection.insertOne(wd);
-    res.json({ ok: true, id: wd.id });
+    res.json({ ok: true, amount: amt, method: method });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.get('/api/doctor/withdrawals', auth, async (req, res) => {
@@ -978,19 +980,7 @@ app.get('/api/doctor/withdrawals', auth, async (req, res) => {
 app.get('/api/admin/withdrawals', adminAuth, async (req, res) => {
   try { const wds = await withdrawalsCollection.find({}).sort({ createdAt: -1 }).toArray(); res.json({ data: wds }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.post('/api/admin/withdrawal/process', adminAuth, async (req, res) => {
-  try {
-    const { id, status } = req.body;
-    if (!id || !status) return res.status(400).json({ error: '缺少参数' });
-    const wd = await withdrawalsCollection.findOne({ id });
-    if (!wd) return res.status(404).json({ error: '记录不存在' });
-    await withdrawalsCollection.updateOne({ id }, { $set: { status, processedAt: new Date().toISOString() } });
-    if (status === 'approved') {
-      await usersCollection.updateOne({ phone: wd.phone }, { $inc: { coins: -wd.amount, doctorWithdrawn: wd.amount }, $push: { coinRecords: { type: 'withdraw', amount: -wd.amount, method: wd.method, time: new Date().toISOString() } } });
-    }
-    res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// Withdrawals are now processed automatically without admin review
 
 
 // ── 医师端智能处方生成 ──

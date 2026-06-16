@@ -1993,7 +1993,7 @@ PAGES.income = (app) => {
                 body:JSON.stringify({amount,method,account})
             });
             var d = await res.json();
-            if(d.ok){ toast('提现申请已提交，等待管理员审核'); loadIncome(); loadWithdrawals(); document.getElementById('wd-amount').value=''; document.getElementById('wd-account').value=''; }
+            if(d.ok){ toast('提现成功！'+d.amount+' 健康币已转入'+(d.method==='wechat'?'微信':'支付宝')); loadIncome(); loadWithdrawals(); document.getElementById('wd-amount').value=''; document.getElementById('wd-account').value=''; }
             else toast(d.error||'提现失败');
         } catch(e){ toast('网络错误'); }
     };

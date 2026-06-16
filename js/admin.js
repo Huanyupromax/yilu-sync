@@ -56,7 +56,6 @@ function sidebarHtml(current) {
     {key:'activities',icon:'👨‍👩‍👧‍👦',label:'亲子活动'},
     {key:'volunteer',icon:'🤝',label:'志愿报名'},
     {key:'qualifications',icon:'🎓',label:'资质审核'},
-    {key:'withdrawals',icon:'💰',label:'提现管理'},
     {key:'data',icon:'📈',label:'健康数据'}
   ];
   var nav = items.map(function(i){
@@ -493,36 +492,7 @@ window.reviewQual = async function(id, status) {
   loadAdminQualifications();
 };
 
-pages.withdrawals = async function() {
-  var app = document.getElementById('admin-app');
-  app.innerHTML = sidebarHtml('withdrawals')+topbarHtml('提现管理')+'<div class="admin-card"><div class="admin-card-title">医师提现申请</div><div id="wd-list"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
-  setupNav();
-  loadAdminWithdrawals();
-};
-async function loadAdminWithdrawals() {
-  var d = await api('GET', '/withdrawals');
-  if(d.data && d.data.length) {
-    var html = '<table class="admin-table"><tr><th>手机号</th><th>金额</th><th>方式</th><th>账号</th><th>状态</th><th>申请时间</th><th>操作</th></tr>'+
-      d.data.map(function(w){
-        var statusHtml = w.status==='approved' ? '<span style="color:green;font-weight:600;">已到账</span>' :
-          w.status==='rejected' ? '<span style="color:red;font-weight:600;">已拒绝</span>' : '<span style="color:orange;font-weight:600;">待审核</span>';
-        var methodLabel = w.method==='wechat' ? '微信' : '支付宝';
-        var actionHtml = w.status==='pending' ?
-          '<button class="btn-admin btn-admin-sm btn-admin-primary" onclick="processWd(\''+w.id+'\',\'approved\')">通过</button>'+
-          '<button class="btn-admin btn-admin-sm btn-admin-danger" onclick="processWd(\''+w.id+'\',\'rejected\')">拒绝</button>' :
-          '<span style="font-size:12px;color:var(--gray);">已处理</span>';
-        return '<tr><td>'+esc(w.phone)+'</td><td>'+w.amount+'</td><td>'+methodLabel+'</td><td>'+esc(w.account)+'</td><td>'+statusHtml+'</td><td>'+(w.createdAt?new Date(w.createdAt).toLocaleString('zh-CN'):'-')+'</td><td style="white-space:nowrap;">'+actionHtml+'</td></tr>';
-      }).join('')+'</table>';
-    document.getElementById('wd-list').innerHTML = html;
-  } else {
-    document.getElementById('wd-list').innerHTML = '<div class="chart-placeholder">暂无提现申请</div>';
-  }
-}
-window.processWd = async function(id, status) {
-  await api('POST', '/withdrawal/process', { id: id, status: status });
-  toast('操作成功');
-  loadAdminWithdrawals();
-};
+// Withdrawal management moved to automatic processing in doctor end
 // ========== 初始化 ==========
 function init() {
   // Load admin user from localStorage
