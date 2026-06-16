@@ -265,6 +265,29 @@ function loadSmartReminders() {
   });
 }
 
+function loadActivitiesList() {
+  var el = document.getElementById('activity-section');
+  if(!el) return;
+  fetch(API_BASE + '/api/activities').then(function(r){return r.json();}).then(function(d){
+    if(!d.data || !d.data.length){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;font-size:13px;">暂无可报名的亲子活动</div>'; return; }
+    var h = '';
+    d.data.forEach(function(a){
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f2;">' +
+        '<div><div style="font-weight:600;font-size:14px;">' + escapeHtml(a.name) + '</div>' +
+        '<div style="font-size:12px;color:#999;">' + (a.startDate||'') + ' ~ ' + (a.endDate||'') + '</div>' +
+        '<div style="font-size:12px;color:#999;">打卡+' + a.checkinReward + '币 / 任务+' + a.taskReward + '币</div></div>' +
+        '<button class="btn btn-primary" style="padding:6px 12px;font-size:13px;white-space:nowrap;" onclick="signupActivity(\'' + a.id + '\')">报名</button></div>';
+    });
+    el.innerHTML = h;
+  });
+}
+window.signupActivity = async function(activityId) {
+  if(!currentUser){ toast('\u8bf7\u5148\u767b\u5f55'); return; }
+  var res = await fetch(API_BASE + '/api/activity/signup', { method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token}, body:JSON.stringify({activityId:activityId}) });
+  var d = await res.json();
+  if(d.ok){ toast('\u62a5\u540d\u6210\u529f'); navigate('activity',{id:activityId}); }else{ toast(d.error||'\u62a5\u540d\u5931\u8d25'); }
+};
+
 function renderElderlyDash() {
   var el = document.getElementById('elderly-dashboard');
   if(!el) return;
@@ -520,6 +543,7 @@ PAGES.home = (app) => {
             <div class="card"><div class="card-title">今日打卡</div><div class="row space-between"><div><div class="fs-40 fw-600 text-orange" id="sign-status">${signed ? '今日已签到' : '还未签到'}</div><div class="text-muted mt-12">连续签到 <span id="streak-num">${streak}</span> 天</div></div><button class="btn btn-primary" id="sign-btn">${signed ? '已签到' : '去签到'}</button></div><div class="progress orange mt-20"><div id="sign-bar" style="width:${signed ? 100 : 30}%"></div></div></div>
             <div class="card"><div class="card-title">老人看板</div><div id="elderly-dashboard"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
             <div class="card"><div class="card-title">智能待办提醒</div><div id="smart-reminders"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+            <div class="card"><div class="card-title">亲子互动活动</div><div id="activity-section"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
         </div>`;
     
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
@@ -556,6 +580,9 @@ PAGES.home = (app) => {
     
     // 智能待办提醒
     loadSmartReminders();
+    
+    // 加载亲子活动
+    loadActivitiesList();
     
     // 签到按钮
     app.querySelector('#sign-btn').onclick = () => {
@@ -1833,6 +1860,68 @@ window.purchaseCourseForElderly = async function(courseId, elderlyPhone) {
   var d = await res.json();
   if(d.ok) { toast('\u8d2d\u4e70\u6210\u529f \u2705 \u8bfe\u7a0b\u5df2\u540c\u6b65\u5230\u8001\u4eba\u8d26\u53f7'); loadCoursesForChildren(); }
   else toast(d.error || '\u8d2d\u4e70\u5931\u8d25');
+};
+
+
+PAGES.activity = (app, params) => {
+  setNavTitle('\u4eb2\u5b50\u6d3b\u52a8');
+  var activityId = params && params.id;
+  if(!activityId){ app.innerHTML = '<div class="container"><div class="text-muted" style="padding:20px;text-align:center;">\u7f3a\u5c11\u6d3b\u52a8ID</div></div>'; return; }
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title" id="act-title">\u52a0\u8f7d\u4e2d...</div><div id="act-info"></div></div>' +
+    '<div class="card" id="checkin-card" style="display:none;"><div class="card-title">\u6bcf\u65e5\u6253\u5361</div>' +
+    '<button class="btn btn-primary btn-block" id="act-checkin-btn">\u70b9\u51fb\u6253\u5361</button></div>' +
+    '<div class="card" id="task-card" style="display:none;"><div class="card-title" id="act-task-title">\u6bcf\u65e5\u4efb\u52a1</div>' +
+    '<div id="act-task-desc" style="font-size:14px;margin-bottom:8px;"></div>' +
+    '<button class="btn btn-primary btn-block" id="act-task-btn">\u5b8c\u6210\u4efb\u52a1</button></div>' +
+    '<div class="card"><div class="card-title">\u6211\u7684\u79ef\u5206</div><div id="act-coins" style="font-size:24px;font-weight:700;color:var(--orange);text-align:center;">0 \u5e01</div></div></div>';
+  
+  var aid = activityId;
+  var today = new Date().toISOString().slice(0,10);
+  
+  // Load activity details
+  fetch(API_BASE + '/api/activities').then(function(r){return r.json();}).then(function(d){
+    var act = d.data ? d.data.find(function(a){ return a.id === aid; }) : null;
+    if(!act) { document.getElementById('act-title').textContent = '\u6d3b\u52a8\u4e0d\u5b58\u5728'; return; }
+    document.getElementById('act-title').textContent = act.name;
+    document.getElementById('act-info').innerHTML = '<div style="font-size:14px;color:#666;">' + escapeHtml(act.description||'') + '</div><div style="font-size:13px;color:#999;margin-top:4px;">' + (act.startDate||'') + ' ~ ' + (act.endDate||'') + '</div>';
+    document.getElementById('act-task-desc').textContent = act.taskDescription || '\u5b8c\u6210\u4eca\u65e5\u5065\u5eb7\u4efb\u52a1';
+    document.getElementById('checkin-card').style.display = 'block';
+    document.getElementById('task-card').style.display = 'block';
+    
+    // Load signup data
+    if(currentUser){
+      fetch(API_BASE + '/api/activity/my', { headers: { Authorization: 'Bearer ' + currentUser.token } }).then(function(r){return r.json();}).then(function(sd){
+        var my = sd.data ? sd.data.find(function(x){ return x.activity.id === aid; }) : null;
+        if(my && my.signup){
+          var coins = my.signup.coinsEarned || 0;
+          document.getElementById('act-coins').innerHTML = coins + ' \u5e01';
+          var checkedIn = my.signup.checkins && my.signup.checkins.includes(today);
+          var taskDone = my.signup.tasks && my.signup.tasks.includes(today);
+          document.getElementById('act-checkin-btn').textContent = checkedIn ? '\u2705 \u4eca\u65e5\u5df2\u6253\u5361' : '\u70b9\u51fb\u6253\u5361 (+' + act.checkinReward + '\u5e01)';
+          document.getElementById('act-checkin-btn').disabled = checkedIn;
+          document.getElementById('act-checkin-btn').style.opacity = checkedIn ? '0.6' : '1';
+          document.getElementById('act-task-btn').textContent = taskDone ? '\u2705 \u4eca\u65e5\u4efb\u52a1\u5df2\u5b8c\u6210' : '\u5b8c\u6210\u4efb\u52a1 (+' + act.taskReward + '\u5e01)';
+          document.getElementById('act-task-btn').disabled = taskDone;
+          document.getElementById('act-task-btn').style.opacity = taskDone ? '0.6' : '1';
+        }
+      });
+    }
+  });
+  
+  // Checkin button
+  document.getElementById('act-checkin-btn').onclick = async function(){
+    if(!currentUser){ toast('\u8bf7\u5148\u767b\u5f55'); return; }
+    var res = await fetch(API_BASE + '/api/activity/checkin', { method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token}, body:JSON.stringify({activityId:aid}) });
+    var d = await res.json();
+    if(d.ok){ toast(d.message||'\u6253\u5361\u6210\u529f'); navigate('activity',{id:aid}); }else{ toast(d.error||'\u5931\u8d25'); }
+  };
+  // Task button
+  document.getElementById('act-task-btn').onclick = async function(){
+    if(!currentUser){ toast('\u8bf7\u5148\u767b\u5f55'); return; }
+    var res = await fetch(API_BASE + '/api/activity/task', { method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token}, body:JSON.stringify({activityId:aid}) });
+    var d = await res.json();
+    if(d.ok){ toast(d.message||'\u4efb\u52a1\u5b8c\u6210'); navigate('activity',{id:aid}); }else{ toast(d.error||'\u5931\u8d25'); }
+  };
 };
 
 PAGES.myrx = (app) => {
