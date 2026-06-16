@@ -53,6 +53,7 @@ function sidebarHtml(current) {
     {key:'prescriptions',icon:'📋',label:'运动处方'},
     {key:'services',icon:'💳',label:'付费管理'},
     {key:'coins',icon:'🪙',label:'健康币管理'},
+    {key:'activities',icon:'👨‍👩‍👧‍👦',label:'亲子活动'},
     {key:'data',icon:'📈',label:'健康数据'}
   ];
   var nav = items.map(function(i){
