@@ -438,7 +438,7 @@ PAGES.sport = (app) => {
           .then(function(r){return r.json();})
           .then(function(d){
             if(d.user){
-              app.querySelector('#patient-search-result').innerHTML = '<div class="form-row" style="border:none;"><span>👤</span><div style="flex:1;"><div>'+escapeHtml(d.user.name||'')+'</div><div class="text-muted" style="font-size:12px;">'+escapeHtml(phone)+'</div></div><button class="btn btn-sm btn-primary" data-phone="'+phone+'">查看数据</button></div>';
+              app.querySelector('#patient-search-result').innerHTML = '<div class="form-row" style="border:none;"><span>👤</span><div style="flex:1;"><div>'+escapeHtml(d.user.name||'')+'</div><div class="text-muted" style="font-size:12px;">'+escapeHtml(phone)+'</div></div><button class="btn btn-sm btn-primary" onclick="navigate(\'doctor-patient-data\',{phone:\'"+phone+"\'})">查看数据</button></div>';
             } else {
               app.querySelector('#patient-search-result').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">未找到该用户</div>';
             }
