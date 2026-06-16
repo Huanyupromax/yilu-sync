@@ -426,7 +426,7 @@ PAGES.sport = (app) => {
             </div>
             <div class="grid-2">
                 <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看用户数据</div></div>
-                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
+                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div><div class="feature-tile purple" data-go="patient-records"><div class="fi">📋</div><div class="fn">诊疗档案</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
             </div>
             <div class="card"><div class="card-title">最近联系的患者</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">暂无记录</div></div></div>
         </div>`;
@@ -2161,6 +2161,59 @@ function loadTodayStats(app) {
                     '</div>';
             }
         });
+}
+
+
+// ── 诊疗档案页面 ──
+PAGES['patient-records'] = (app) => {
+    setNavTitle('诊疗档案');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">诊疗档案</div><div class="header-subtitle">查看患者的连续健康诊疗记录</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="rec-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="rec-search-btn" style="padding:6px 12px;">搜索</button></div>
+            </div>
+            <div id="rec-content"></div>
+        </div>`;
+    
+    app.querySelector('#rec-search-btn').onclick = function(){
+        var phone = app.querySelector('#rec-phone').value.trim();
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        loadPatientRecords(app, phone);
+    };
+    
+    // Enter key support
+    app.querySelector('#rec-phone').onkeypress = function(e){
+        if(e.key==='Enter') app.querySelector('#rec-search-btn').click();
+    };
+};
+
+async function loadPatientRecords(app, phone) {
+    var content = app.querySelector('#rec-content');
+    content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">加载中...</div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/patient-records/'+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.data && d.data.length){
+            var html = '<div class="card" style="margin-bottom:8px;background:var(--orange-light);"><div style="text-align:center;padding:8px;"><strong>📋 共 '+d.data.length+' 条诊疗记录</strong></div></div>';
+            d.data.forEach(function(r){
+                var rx = r.prescription || {};
+                var itemsHtml = '';
+                if(rx.items && rx.items.length){
+                    itemsHtml = rx.items.map(function(i){ return '<div style="font-size:14px;margin:4px 0;">'+(i.icon||'')+' <strong>'+(i.name||'')+'</strong> - '+(i.detail||'')+'</div>'; }).join('');
+                }
+                var goalHtml = rx.goal ? '<div style="font-size:14px;margin:4px 0;"><strong>运动目标:</strong> '+escapeHtml(rx.goal)+'</div>' : '';
+                var dietHtml = rx.dietAdvice ? '<div style="margin-top:6px;padding:6px;background:#fff8f0;border-radius:6px;font-size:13px;"><strong>营养建议:</strong> '+escapeHtml(rx.dietAdvice)+'</div>' : '';
+                html += '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div><div style="font-weight:600;font-size:15px;">'+(r.savedAt?new Date(r.savedAt).toLocaleString('zh-CN'):'未知时间')+'</div><div style="font-size:12px;color:var(--gray);">由 '+(r.doctorName||'医师')+' 开具</div></div></div>'+goalHtml+itemsHtml+dietHtml+(r.doctorNotes?'<div style="margin-top:6px;padding:6px;background:var(--orange-light);border-radius:6px;font-size:13px;"><strong>医师备注:</strong> '+escapeHtml(r.doctorNotes)+'</div>':'')+'</div>';
+            });
+            content.innerHTML = html;
+        } else {
+            content.innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">📋</div><div class="text-muted">该患者暂无诊疗记录</div></div>';
+        }
+    } catch(e){
+        content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">加载失败</div>';
+    }
 }
 // ========== 初始化 ==========
 

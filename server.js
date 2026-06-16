@@ -1050,6 +1050,15 @@ app.get('/api/doctor/today-stats', auth, async (req, res) => {
     res.json({ ok: true, prescriptionsToday: rxToday, chatPatientsToday: chatCount });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 患者诊疗档案 ──
+app.get('/api/doctor/patient-records/:phone', auth, async (req, res) => {
+  try {
+    var records = DB_prescriptions.filter(function(p){ return p.phone === req.params.phone; });
+    records.sort(function(a,b){ return (b.savedAt||'').localeCompare(a.savedAt||''); });
+    res.json({ data: records });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
