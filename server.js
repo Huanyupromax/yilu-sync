@@ -47,6 +47,8 @@ async function connectDB() {
     messagesCollection = db.collection('messages');
     activitiesCollection = db.collection('activities');
     activitySignupsCollection = db.collection('activity_signups');
+    volunteerCollection = db.collection('volunteer');
+    volunteerAppCollection = db.collection('volunteer_apps');
     await usersCollection.createIndex({ phone: 1 }, { unique: true });
     await groupsCollection.createIndex({ members: 1 });
     await groupMessagesCollection.createIndex({ groupId: 1, timestamp: -1 });
@@ -895,6 +897,43 @@ app.post('/api/activity/task', auth, async (req, res) => {
     await activitySignupsCollection.updateOne({ _id: signup._id }, { $push: { tasks: today }, $inc: { coinsEarned: reward } });
     await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: reward } });
     res.json({ ok: true, message: '任务完成 +' + reward + ' 健康币', reward: reward });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 志愿者管理 ──
+app.post('/api/volunteer/create', async (req, res) => {
+  try {
+    const { title, description, location, date, time, rewardPerHour } = req.body;
+    if (!title) return res.status(400).json({ error: '缺少标题' });
+    const id = 'vol_' + Date.now();
+    await volunteerCollection.insertOne({ id, title, description: description || '', location: location || '', date: date || '', time: time || '', rewardPerHour: parseInt(rewardPerHour) || 10, active: true, createdAt: new Date().toISOString() });
+    res.json({ ok: true, id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/volunteer/list', async (req, res) => {
+  try { const v = await volunteerCollection.find({ active: { $ne: false } }).sort({ createdAt: -1 }).toArray(); res.json({ data: v }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/volunteer/apply', auth, async (req, res) => {
+  try {
+    const { volunteerId } = req.body;
+    if (!volunteerId) return res.status(400).json({ error: '缺少ID' });
+    const exist = await volunteerAppCollection.findOne({ volunteerId, phone: req.phone });
+    if (exist) return res.json({ ok: true, message: '已报名' });
+    await volunteerAppCollection.insertOne({ volunteerId, phone: req.phone, status: 'pending', hours: 0, coinsEarned: 0, appliedAt: new Date().toISOString() });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/volunteer/my', auth, async (req, res) => {
+  try {
+    const apps = await volunteerAppCollection.find({ phone: req.phone }).toArray();
+    const ids = apps.map(function(a){ return a.volunteerId; });
+    const vols = ids.length > 0 ? await volunteerCollection.find({ id: { $in: ids } }).toArray() : [];
+    var result = [];
+    apps.forEach(function(a){
+      var v = vols.find(function(x){ return x.id === a.volunteerId; });
+      result.push({ volunteer: v || null, app: a });
+    });
+    res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
