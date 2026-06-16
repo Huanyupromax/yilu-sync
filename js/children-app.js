@@ -294,7 +294,7 @@ function logout() {
 }
 
 // ========== 路由 ==========
-const TABBAR_PAGES = ['home', 'data', 'messages', 'me'];
+const TABBAR_PAGES = ['home', 'messages', 'me'];
 const TABBAR_LIST = [
     { key: 'home', text: '健康', icon: '❤️' },
     { key: 'data', text: '数据', icon: '📈' },
