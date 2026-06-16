@@ -1570,15 +1570,38 @@ PAGES.me = (app) => {
         <div class="container">
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">我的</div><div class="header-subtitle">个人中心</div></div></div>
             <div class="card"><div class="row"><div class="avatar orange" style="width:65px;height:65px;font-size:35px;">\uD83D\uDC68</div><div><div class="fs-40 fw-600">${escapeHtml(p.name || '张三')}${(currentUser&&currentUser.role?'<span class="tag orange">' + escapeHtml(currentUser.role) + '</span>':'')}${p.hasChronic ? '<span class="tag">慢性病</span>' : ''}<span class="tag orange">VIP</span></div></div><button class="btn btn-ghost" data-go="profile-setup">编辑</button></div><div class="row mt-20"><div class="info-pill green"><div class="fs-36 fw-600">${p.height || '178'} cm</div><div>身高</div></div><div class="info-pill orange"><div class="fs-36 fw-600">${p.weight || '66'} kg</div><div>体重</div></div></div></div>
-            <div class="card"><div class="card-title">账号</div><div class="form-row" data-go="profile-setup"><span>\uD83D\uDC68\u200D</span><div style="flex:1">个人资料</div><span>\u203A</span></div><div class="form-row" data-go="monitor"><span>\uD83D\uDCF3</span><div style="flex:1">我的数据</div><span>\u203A</span></div><div class="form-row" data-go="coin"><span>\uD83E\uDE99</span><div style="flex:1">健康币</div><span>${storage.signStreak()+2} 枚 \u203A</span></div><div class="form-row" data-go="services"><span>\uD83D\uDCB3</span><div style="flex:1">付费服务</div><span>\u203A</span></div><div class="form-row" data-go="myrx"><span>\uD83D\uDCCB</span><div style="flex:1">我的处方</div><span>\u203A</span></div><div class="form-row" data-go="account"><span>\uD83D\uDD10</span><div style="flex:1">账号管理</div><span>\u203A</span></div></div>
+            <div class="card"><div class="card-title">账号</div><div class="form-row" data-go="profile-setup"><span>\uD83D\uDC68\u200D</span><div style="flex:1">个人资料</div><span>\u203A</span></div><div class="form-row" data-go="monitor"><span>\uD83D\uDCF3</span><div style="flex:1">我的数据</div><span>\u203A</span></div><div class="form-row" data-go="coin"><span>\uD83E\uDE99</span><div style="flex:1">健康币</div><span>${storage.signStreak()+2} 枚 \u203A</span></div><div class="form-row" data-go="services"><span>\uD83D\uDCB3</span><div style="flex:1">付费服务</div><span>\u203A</span></div><div class="form-row" data-go="myrx"><span>\uD83D\uDCCB</span><div style="flex:1">我的处方</div><span>\u203A</span></div><div class="form-row" id="bind-elderly-btn"><span>👴</span><div style="flex:1">绑定老人</div><span>›</span></div><div class="form-row" data-go="account"><span>\uD83D\uDD10</span><div style="flex:1">账号管理</div><span>\u203A</span></div></div>
             <div class="card"><div class="card-title">更多</div><div class="form-row"><span>\uD83D\uDCDA</span><div style="flex:1">课程与计划</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFC6</span><div style="flex:1">成就</div><span>\u203A</span></div><div class="form-row" data-go="settings"><span>\u2699\uFE0F</span><div style="flex:1">设置</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDCAC</span><div style="flex:1">用户反馈</div><span>\u203A</span></div><div class="form-row" onclick="window.customerService()"><span>\uD83C\uDFDE\uFE0F</span><div style="flex:1">联系客服</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDEE1\uFE0F</span><div style="flex:1">隐私政策</div><span>\u203A</span></div></div>
             <div class="card"><div class="form-row" id="logout-btn" style="border-bottom:none;justify-content:center;"><span>\uD83D\uDEAA</span><div style="flex:1;text-align:center;color:var(--red);font-size:16px;">退出登录</div><span></span></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
     app.querySelector('#logout-btn').onclick = logout;
+    app.querySelector('#bind-elderly-btn').onclick = showBindElderlyDialog;
 };
 
 // ========== 初始化 ==========
+
+// 绑定老人对话框
+function showBindElderlyDialog() {
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  var boundPhone = localStorage.getItem('boundElderlyPhone') || '';
+  d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;width:85%;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.2);">' +
+    '<div style="font-size:18px;font-weight:600;margin-bottom:16px;">\u7ed1\u5b9a\u8001\u4eba</div>' +
+    '<div style="margin-bottom:12px;"><input id="bind-phone-input" class="form-input" placeholder="\u8f93\u5165\u8001\u4eba\u624b\u673a\u53f7" value="' + escapeHtml(boundPhone) + '" style="width:100%;" /></div>' +
+    (boundPhone ? '<div style="font-size:13px;color:var(--green);margin-bottom:12px;">\u5df2\u7ed1\u5b9a\uff1a' + escapeHtml(boundPhone) + '</div>' : '') +
+    '<div style="display:flex;gap:8px;"><button class="btn btn-primary" style="flex:1;padding:10px;" id="bind-confirm-btn">\u4fdd\u5b58</button><button class="btn btn-ghost" style="flex:1;padding:10px;" id="bind-cancel-btn">\u53d6\u6d88</button></div></div>';
+  document.body.appendChild(d);
+  d.querySelector('#bind-confirm-btn').onclick = function(){
+    var phone = d.querySelector('#bind-phone-input').value.trim();
+    if(!phone){ toast('\u8bf7\u8f93\u5165\u624b\u673a\u53f7'); return; }
+    localStorage.setItem('boundElderlyPhone', phone);
+    toast('\u5df2\u7ed1\u5b9a\u8001\u4eba\uff1a' + phone);
+    d.remove();
+  };
+  d.querySelector('#bind-cancel-btn').onclick = function(){ d.remove(); };
+  d.onclick = function(e){ if(e.target===d) d.remove(); };
+}
 
 // ── 付费服务页面 ──
 PAGES.services = (app) => {
@@ -1586,8 +1609,8 @@ PAGES.services = (app) => {
   app.innerHTML = '<div class="container">'+
     '<div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div>'+
     '<div class="card"><div class="card-title">为老人购买</div>'+
-    '<div style="margin-bottom:6px;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="width:100%;" /></div>'+
-    '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">输入手机号后，下方购买服务或课程时自动为该老人购买</div></div>'+
+    '<div style="margin-bottom:6px;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="width:100%;" value="' + (localStorage.getItem('boundElderlyPhone')||'') + '" /></div>'+
+    '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">已在「我的-绑定老人」中设置过的话，手机号会自动填入</div></div>'+
     '<div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div>'+
     '<div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div>'+
     '<div class="card"><div class="card-title">为老人购买课程</div>'+
