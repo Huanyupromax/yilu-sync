@@ -192,6 +192,79 @@ async function pullFromCloud() {
     }
 }
 
+function loadSmartReminders() {
+  var el = document.getElementById('smart-reminders');
+  if(!el) return;
+  var boundPhone = localStorage.getItem('boundElderlyPhone');
+  if(!boundPhone){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;font-size:13px;">请先绑定老人手机号，即可查看智能提醒</div>'; return; }
+  if(typeof currentUser === 'undefined' || !currentUser){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">请先登录</div>'; return; }
+  fetch(API_BASE+'/api/elderly/dashboard/'+encodeURIComponent(boundPhone),{
+    headers:{'Authorization':'Bearer '+currentUser.token}
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.error){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">'+d.error+'</div>'; return; }
+    var h = '';
+    var alerts = [];
+    
+    // 1. 课程通知
+    var today = new Date().toISOString().slice(0,10);
+    if(d.courses && d.courses.length > 0){
+      alerts.push({type:'info', icon:'\uD83D\uDCDA', text:'\u4eca\u65e5\u6709 ' + d.courses.length + ' \u95e8\u8bfe\u7a0b\u5b89\u6392'});
+    } else {
+      alerts.push({type:'muted', icon:'\uD83D\uDCC5', text:'\u4eca\u65e5\u65e0\u8bfe\u7a0b\u5b89\u6392'});
+    }
+    
+    // 2. 运动预警 - check todayRecord
+    var rec = d.todayRecord || {};
+    var hasExercise = rec.steps || rec.heartRate;
+    if(!hasExercise){
+      alerts.push({type:'warning', icon:'\u26A0\uFE0F', text:'\u4eca\u65e5\u5c1a\u672a\u8bb0\u5f55\u8fd0\u52a8\u6570\u636e\uff0c\u8bf7\u63d0\u9192\u8001\u4eba\u8fd0\u52a8'});
+    } else {
+      alerts.push({type:'success', icon:'\u2705', text:'\u4eca\u65e5\u5df2\u8bb0\u5f55\u8fd0\u52a8\u6570\u636e'});
+    }
+    
+    // 3. 健康数据异常告警
+    var issues = [];
+    if(rec.bp){
+      var bp = parseInt(rec.bp);
+      if(bp > 140) issues.push('\u8840\u538b\u504f\u9ad8\uff08' + rec.bp + ' mmHg\uff09');
+      else if(bp < 90) issues.push('\u8840\u538b\u504f\u4f4e\uff08' + rec.bp + ' mmHg\uff09');
+    }
+    if(rec.heartRate){
+      var hr = parseInt(rec.heartRate);
+      if(hr > 100) issues.push('\u5fc3\u7387\u8fc7\u5feb\uff08' + hr + ' \u6b21/\u5206\uff09');
+      else if(hr < 60) issues.push('\u5fc3\u7387\u8fc7\u6162\uff08' + hr + ' \u6b21/\u5206\uff09');
+    }
+    if(rec.bloodOxygen){
+      var bo = parseInt(rec.bloodOxygen);
+      if(bo < 95) issues.push('\u8840\u6c27\u504f\u4f4e\uff08' + bo + '%\uff09');
+    }
+    if(rec.bloodSugar){
+      var bs = parseFloat(rec.bloodSugar);
+      if(bs > 7.0) issues.push('\u8840\u7cd6\u504f\u9ad8\uff08' + bs + ' mmol/L\uff09');
+      else if(bs < 3.9) issues.push('\u8840\u7cd6\u504f\u4f4e\uff08' + bs + ' mmol/L\uff09');
+    }
+    if(issues.length > 0){
+      alerts.push({type:'danger', icon:'\uD83D\uDEA8', text: issues.join('; ')});
+    } else if(hasExercise) {
+      alerts.push({type:'success', icon:'\u2705', text:'\u4eca\u65e5\u5065\u5eb7\u6570\u636e\u5747\u5728\u6b63\u5e38\u8303\u56f4\u5185'});
+    }
+    
+    // 4. 运动处方
+    if(d.prescription && d.prescription.items){
+      alerts.push({type:'info', icon:'\uD83C\uDFC3', text:'\u5f53\u524d\u8fd0\u52a8\u65b9\u6848\uff1a' + (d.prescription.items||[]).join('\u3001')});
+    }
+    
+    // Render
+    alerts.forEach(function(a){
+      var bg = a.type === 'danger' ? '#fff0f0' : a.type === 'warning' ? '#fff8e8' : a.type === 'success' ? '#f0fff0' : '#f7f8fa';
+      var color = a.type === 'danger' ? '#e8504a' : a.type === 'warning' ? '#e68a2e' : a.type === 'success' ? '#22a559' : '#666';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;background:' + bg + ';border-radius:8px;font-size:13px;color:' + color + ';"><span>' + a.icon + '</span><span>' + a.text + '</span></div>';
+    });
+    
+    el.innerHTML = h;
+  });
+}
+
 function renderElderlyDash() {
   var el = document.getElementById('elderly-dashboard');
   if(!el) return;
@@ -446,7 +519,7 @@ PAGES.home = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">颐路相伴</div><div class="header-subtitle">您好，${escapeHtml(name)}</div></div></div>
             <div class="card"><div class="card-title">今日打卡</div><div class="row space-between"><div><div class="fs-40 fw-600 text-orange" id="sign-status">${signed ? '今日已签到' : '还未签到'}</div><div class="text-muted mt-12">连续签到 <span id="streak-num">${streak}</span> 天</div></div><button class="btn btn-primary" id="sign-btn">${signed ? '已签到' : '去签到'}</button></div><div class="progress orange mt-20"><div id="sign-bar" style="width:${signed ? 100 : 30}%"></div></div></div>
             <div class="card"><div class="card-title">老人看板</div><div id="elderly-dashboard"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
-            <div class="card"><div class="card-title">已购课程</div><div id="elderly-purchases"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+            <div class="card"><div class="card-title">智能待办提醒</div><div id="smart-reminders"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
         </div>`;
     
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
@@ -480,6 +553,9 @@ PAGES.home = (app) => {
     
     // Load elderly dashboard
     renderElderlyDash();
+    
+    // 智能待办提醒
+    loadSmartReminders();
     
     // 签到按钮
     app.querySelector('#sign-btn').onclick = () => {
