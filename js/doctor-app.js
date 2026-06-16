@@ -368,10 +368,51 @@ PAGES.home = (app) => {
                 <div class="feature-tile purple" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送处方</div></div>
                 <div class="feature-tile blue" data-go="messages"><div class="fi">💬</div><div class="fn">消息</div></div>
             </div>
+            <div class="card"><div class="card-title">📋 绑定患者</div>
+                <div class="form-row"><input id="bind-patient-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="bind-patient-btn" style="padding:6px 12px;">绑定</button></div>
+                <div id="bind-result"></div>
+                <div id="bound-patients"><div class="text-muted" style="text-align:center;padding:12px;" id="no-patients-msg">暂无绑定患者</div></div>
+            </div>
             <div class="card"><div class="card-title">快速统计</div><div id="work-stat"><div class="text-muted" style="text-align:center;padding:12px;">连接服务器后可查看统计数据</div></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
+    renderBoundPatients(app);
+    app.querySelector('#bind-patient-btn').onclick = function(){
+        var phone = app.querySelector('#bind-patient-input').value.trim();
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">搜索中...</div>';
+        fetch(API_BASE+'/api/user/search?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}})
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(d.user){
+              var patients = JSON.parse(localStorage.getItem('dr_patients')||'[]');
+              if(patients.some(function(p){return p.phone===phone;})){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--orange);">该患者已绑定</div>'; return; }
+              patients.push({phone:phone, name:d.user.name||'未命名'});
+              localStorage.setItem('dr_patients', JSON.stringify(patients));
+              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:green;">绑定成功</div>';
+              renderBoundPatients(app);
+            } else {
+              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该用户</div>';
+            }
+          })
+          .catch(function(){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">搜索失败</div>'; });
+    };
 };
+
+function renderBoundPatients(app) {
+    var patients = JSON.parse(localStorage.getItem('dr_patients')||'[]');
+    var container = app.querySelector('#bound-patients');
+    var noMsg = app.querySelector('#no-patients-msg');
+    if(!container) return;
+    if(patients.length === 0) {
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无绑定患者</div>';
+        return;
+    }
+    container.innerHTML = patients.map(function(p){
+        return '<div class="list-item" style="cursor:pointer;" onclick="navigate(\'doctor-patient-data\',{phone:\''+p.phone+'\'})"><div class="avatar orange">\uD83D\uDC64</div><div class="list-content"><div class="list-name">'+escapeHtml(p.name)+'</div><div class="list-desc">'+escapeHtml(p.phone)+'</div></div></div>';
+    }).join('');
+}
 
 PAGES.sport = (app) => {
     setNavTitle('患者管理');
@@ -421,7 +462,7 @@ PAGES.data = (app) => {
 };
 
 
-PAGES['doctor-patient-data'] = (app) => {
+PAGES['doctor-patient-data'] = (app, params) => {
     setNavTitle('查看用户数据');
     app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">👥</div><div><div class="t">老年用户健康数据</div><div class="s">输入手机号查看用户的运动健康记录</div></div></div>' +
       '<div class="card"><div class="card-title">搜索用户</div>' +
@@ -438,7 +479,13 @@ PAGES['doctor-patient-data'] = (app) => {
     var currentPatientPhone = '';
     var patientDailyRecords = {};
     
-    app.querySelector('#back-from-patient-data').onclick = function() { navigate('data'); };
+    
+    // Auto-search if phone param provided
+    if(params && params.phone){
+        document.getElementById('patient-search-input').value = params.phone;
+        setTimeout(searchPatient, 100);
+    }
+    app.querySelector('#back-from-patient-data').onclick = function() { navigate('home'); };
     
     app.querySelector('#patient-search-btn').onclick = searchPatient;
     document.getElementById('patient-search-input').onkeypress = function(e) { if(e.key==='Enter') searchPatient(); };
