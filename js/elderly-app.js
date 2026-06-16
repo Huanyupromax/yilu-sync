@@ -1254,6 +1254,8 @@ PAGES.coin = (app) => {
       '<div style="text-align:center;font-size:16px;margin-bottom:12px;">选择金额: <strong id="selected-amount">50</strong> 枚</div>'+
       '<div style="display:flex;gap:8px;margin-bottom:8px;"><button class="btn btn-secondary" style="flex:1;font-size:16px;" onclick=\'doRecharge("微信")\'>\uD83D\uDCB1 微信支付</button><button class="btn btn-primary" style="flex:1;font-size:16px;" onclick=\'doRecharge("支付宝")\'>\uD83D\uDCB0 支付宝</button></div>'+
       '<div id="recharge-result" style="text-align:center;font-size:14px;"></div></div>'+
+'<div style="text-align:center;font-size:12px;color:#999;padding:8px 0;">💡 1健康币 = 1元，可用于兑换课程与服务</div>'+
+
       '<div class="card"><div class="card-title">付费服务</div><div id="svc-in-coin"><div class="text-muted" style="text-align:center;padding:10px;">无</div></div></div></div>';
     // Load coins from server
     if(currentUser){
