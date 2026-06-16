@@ -213,7 +213,7 @@ function logout() {
 const TABBAR_PAGES = ['home', 'sport', 'data', 'messages', 'me'];
 const TABBAR_LIST = [
     { key: 'home', text: '健康', icon: '❤️' },
-    { key: 'sport', text: '运动', icon: '🏃' },
+    { key: 'sport', text: '患者', icon: '👥' },
     { key: 'data', text: '数据', icon: '📈' },
     { key: 'messages', text: '消息', icon: '💬' },
     { key: 'me', text: '我的', icon: '👤' }
@@ -396,30 +396,35 @@ PAGES.home = (app) => {
 };
 
 PAGES.sport = (app) => {
-    const signed = storage.isSignedToday();
-    const streak = storage.signStreak();
+    setNavTitle('患者管理');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">今日运动</div><div class="header-subtitle">${new Date().toLocaleDateString()}</div></div></div>
-            <div class="card" style="text-align:center;"><div class="text-muted">每日签到</div><div style="margin:16px;"><div class="sign-circle ${signed ? 'active' : ''}" id="sign-circle">${signed ? '✓' : '签到'}</div></div><div class="fs-36 fw-600 text-orange" id="sport-sign-text">${signed ? '今日已签到 · +10 健康币' : '点击签到'}</div><div class="text-muted mt-12">连续签到 <span id="sport-streak">${streak}</span> 天</div></div>
-            <div class="card"><div class="card-title">今日运动方案</div><div class="course-card"><div class="icon">🥋</div><div class="info"><div class="name">太极拳</div><div class="desc">低强度有氧 · 控制心率 ≤100</div></div><div class="fs-36">30 min</div></div></div>
-            <button class="btn btn-secondary btn-block" id="start-btn">我知道了 · 开始运动</button>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">患者管理</div><div class="header-subtitle">查看和管理您的患者</div></div></div>
+            <div class="card"><div class="card-title">搜索患者</div>
+                <div class="form-row"><input id="patient-search-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="patient-search-btn" style="padding:6px 12px;">搜索</button></div>
+                <div id="patient-search-result"></div>
+            </div>
+            <div class="grid-2">
+                <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看用户数据</div></div>
+                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
+            </div>
+            <div class="card"><div class="card-title">最近联系的患者</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">暂无记录</div></div></div>
         </div>`;
-    app.querySelector('#sign-circle').onclick = () => {
-        if (storage.isSignedToday()) { toast('今天已签到'); return; }
-        storage.addSignToday();
-          // 签到奖励
-          if(currentUser){
-            fetch(API_BASE+"/api/coins/signin",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();});
-          }
-        toast('签到成功 +10 健康币');
-        const c = app.querySelector('#sign-circle');
-        c.classList.add('active');
-        c.textContent = '✓';
-        app.querySelector('#sport-sign-text').textContent = '今日已签到 · +10 健康币';
-        app.querySelector('#sport-streak').textContent = storage.signStreak();
+    app.querySelector('#patient-search-btn').onclick = function(){
+        var phone = app.querySelector('#patient-search-input').value.trim();
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        fetch(API_BASE+'/api/user/search?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}})
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(d.user){
+              app.querySelector('#patient-search-result').innerHTML = '<div class="form-row" style="border:none;"><span>👤</span><div style="flex:1;"><div>'+escapeHtml(d.user.name||'')+'</div><div class="text-muted" style="font-size:12px;">'+escapeHtml(phone)+'</div></div><button class="btn btn-sm btn-primary" data-phone="'+phone+'">查看数据</button></div>';
+            } else {
+              app.querySelector('#patient-search-result').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">未找到该用户</div>';
+            }
+          })
+          .catch(function(){ toast('搜索失败'); });
     };
-    app.querySelector('#start-btn').onclick = () => toast('祝您运动愉快');
 };
 
 PAGES.data = (app) => {
