@@ -1083,7 +1083,7 @@ PAGES.courses = (app) => {
             }).join('');
           document.getElementById('courses-content').innerHTML = html;
         } else {
-          document.getElementById('courses-content').innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">暂无已购课程<br><span style="font-size:13px;">请联系子女为您购买课程</span></div>';
+          document.getElementById('courses-content').innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">暂无已购课程<br><span style="font-size:13px;">请联系子女为您购买课程</span></div><div style="margin-top:12px;padding:12px;background:#f7f8fa;border-radius:8px;font-size:12px;color:#666;"><div>手机号: ' + escapeHtml(currentUser ? currentUser.phone : '') + '</div><div>调试: ' + escapeHtml(JSON.stringify(d)) + '</div></div>';
         }
       })
       .catch(function(){
