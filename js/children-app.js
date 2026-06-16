@@ -228,8 +228,8 @@ function renderElderlyDash() {
     var items = [
       {label:'\u8840\u538b',val:(d.healthData&&d.healthData.bloodPressure)||'--'},
       {label:'\u5fc3\u7387',val:(d.healthData&&d.healthData.heartRate)||'--'},
-      {label:'\u8eab\u9ad8',val:(d.healthData&&d.healthData.height)||'--'},
-      {label:'\u4f53\u91cd',val:(d.healthData&&d.healthData.weight)||'--'}
+      {label:'\u8eab\u9ad8',val:(d.profile&&d.profile.height?d.profile.height+' cm':'--')},
+      {label:'\u4f53\u91cd',val:(d.profile&&d.profile.weight?d.profile.weight+' kg':'--')}
     ];
     items.forEach(function(it){
       h += '<div style="background:#f7f8fa;border-radius:12px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:600;color:var(--primary);">'+it.val+'</div><div style="font-size:12px;color:var(--gray);margin-top:2px;">'+it.label+'</div></div>';
