@@ -251,7 +251,7 @@ function loadSmartReminders() {
     
     // 4. 运动处方
     if(d.prescription && d.prescription.items){
-      alerts.push({type:'info', icon:'\uD83C\uDFC3', text:'\u5f53\u524d\u8fd0\u52a8\u65b9\u6848\uff1a' + (d.prescription.items||[]).join('\u3001')});
+      alerts.push({type:'info', icon:'\uD83C\uDFC3', text:'\u5f53\u524d\u8fd0\u52a8\u65b9\u6848\uff1a' + (d.prescription.items||[]).map(function(x){return x.name||x;}).join('\u3001')});
     }
     
     // Render
