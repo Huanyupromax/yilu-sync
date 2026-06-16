@@ -544,3 +544,53 @@ async function loadActivities() {
     document.getElementById('activities-list').innerHTML = '<div class="chart-placeholder">暂无活动</div>';
   }
 }
+
+
+pages.volunteer = async function() {
+  var app = document.getElementById('admin-app');
+  app.innerHTML = sidebarHtml('volunteer')+topbarHtml('志愿报名')+
+    '<div class="admin-card"><div class="admin-card-title">发布志愿活动</div>'+
+    '<div class="form-group"><label>活动名称</label><input id="vol-name" placeholder="如：社区健康服务" /></div>'+
+    '<div class="form-group"><label>活动描述</label><textarea id="vol-desc" rows="2" placeholder="活动内容介绍"></textarea></div>'+
+    '<div class="form-row-grid"><div class="form-group"><label>服务地点</label><input id="vol-location" placeholder="如：社区中心" /></div>'+
+    '<div class="form-group"><label>服务日期</label><input id="vol-date" type="date" /></div></div>'+
+    '<div class="form-row-grid"><div class="form-group"><label>服务时间</label><input id="vol-time" placeholder="如：09:00-12:00" /></div>'+
+    '<div class="form-group"><label>每小时奖励 (健康币)</label><input id="vol-reward" type="number" value="10" /></div></div>'+
+    '<button class="btn-admin btn-admin-primary" id="vol-publish">发布活动</button></div>'+
+    '<div class="admin-card"><div class="admin-card-title">已发布志愿活动</div><div id="vol-list"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
+  setupNav();
+  loadVolunteerData();
+  document.getElementById('vol-publish').onclick = async function(){
+    var title = document.getElementById('vol-name').value.trim();
+    if(!title){ toast('请填写活动名称'); return; }
+    var description = document.getElementById('vol-desc').value.trim();
+    var location = document.getElementById('vol-location').value.trim();
+    var date = document.getElementById('vol-date').value;
+    var time = document.getElementById('vol-time').value.trim();
+    var rewardPerHour = parseInt(document.getElementById('vol-reward').value) || 10;
+    var res = await fetch('/api/volunteer/create', { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer admin-'+btoa(adminUser)}, body:JSON.stringify({title, description, location, date, time, rewardPerHour}) });
+    var d = await res.json();
+    if(d.ok){ toast('志愿活动已发布'); loadVolunteerData(); }else{ toast('失败: '+(d.error||'')); }
+  };
+};
+async function loadVolunteerData() {
+  var d = await fetch('/api/admin/volunteer/data').then(function(r){return r.json();});
+  if(d.data && d.data.length) {
+    var html = '<table class="admin-table"><tr><th>名称</th><th>地点</th><th>日期</th><th>时间</th><th>奖励/时</th><th>报名人数</th></tr>'+
+      d.data.map(function(v){ 
+        var appCount = v.applicants ? v.applicants.length : 0;
+        return '<tr><td>'+esc(v.title)+'</td><td>'+esc(v.location||'-')+'</td><td>'+(v.date||'-')+'</td><td>'+(v.time||'-')+'</td><td>'+v.rewardPerHour+' 币</td><td>'+appCount+' 人</td></tr>';
+      }).join('')+'</table>'+
+      d.data.map(function(v){
+        if(!v.applicants || !v.applicants.length) return '';
+        var r = '<div class="admin-card" style="margin-top:12px;"><div class="admin-card-title" style="font-size:14px;">📋 '+esc(v.title)+' - 报名列表</div><table class="admin-table"><tr><th>手机号</th><th>状态</th><th>服务时长</th><th>获得币</th><th>报名时间</th></tr>'+
+          v.applicants.map(function(a){ 
+            return '<tr><td>'+esc(a.phone)+'</td><td>'+(a.status==='pending'?'待确认':a.status==='approved'?'已通过':'已完成')+'</td><td>'+a.hours+' 小时</td><td>'+a.coinsEarned+' 币</td><td>'+(a.appliedAt?new Date(a.appliedAt).toLocaleString('zh-CN'):'-')+'</td></tr>';
+          }).join('')+'</table></div>';
+        return r;
+      }).join('');
+    document.getElementById('vol-list').innerHTML = html;
+  } else {
+    document.getElementById('vol-list').innerHTML = '<div class="chart-placeholder">暂无志愿活动，请发布新活动</div>';
+  }
+}

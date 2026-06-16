@@ -901,7 +901,7 @@ app.post('/api/activity/task', auth, async (req, res) => {
 });
 
 // ── 志愿者管理 ──
-app.post('/api/volunteer/create', async (req, res) => {
+app.post('/api/volunteer/create', adminAuth, async (req, res) => {
   try {
     const { title, description, location, date, time, rewardPerHour } = req.body;
     if (!title) return res.status(400).json({ error: '缺少标题' });
@@ -932,6 +932,20 @@ app.get('/api/volunteer/my', auth, async (req, res) => {
     apps.forEach(function(a){
       var v = vols.find(function(x){ return x.id === a.volunteerId; });
       result.push({ volunteer: v || null, app: a });
+    });
+    res.json({ data: result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+// Admin: get all volunteer opportunities with applicants
+app.get('/api/admin/volunteer/data', adminAuth, async (req, res) => {
+  try {
+    const vols = await volunteerCollection.find({}).sort({ createdAt: -1 }).toArray();
+    const apps = await volunteerAppCollection.find({}).toArray();
+    const result = vols.map(function(v) {
+      const relevantApps = apps.filter(function(a) { return a.volunteerId === v.id; });
+      return Object.assign({}, v, { applicants: relevantApps });
     });
     res.json({ data: result });
   } catch (err) { res.status(500).json({ error: err.message }); }
