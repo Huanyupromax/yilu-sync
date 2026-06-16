@@ -1,8 +1,8 @@
-// ========== ���� ==========
+﻿// ========== 配置 ==========
 const API_BASE = '';
 let currentUser = null;
 
-// ========== ���ش洢 ==========
+// ========== 本地存储 ==========
 const KEYS = {
     PROFILE: 'profile',
     SIGN_HISTORY: 'signHistory',
@@ -65,18 +65,18 @@ const storage = {
         const age = parseInt(p.age || 60);
         const hasChronic = p.hasChronic;
         const maxHr = Math.round((220 - age) * 0.6);
-        const items = ['̫��ȭ', '����'];
-        if (age < 70) items.push('�˶ν�');
-        if (!hasChronic) items.push('������');
+        const items = ['太极拳', '慢走'];
+        if (age < 70) items.push('八段锦');
+        if (!hasChronic) items.push('健步走');
         return {
-            doctor: 'Ӫ��ʦ������ע��Ӫ��ʦ',
-            hospital: '��ʯ������ �� ������������',
+            doctor: '营养师，国家注册营养师',
+            hospital: '黑石礁社区 · 健康服务中心',
             maxHeartRate: maxHr,
             items,
-            frequency: hasChronic ? 'ÿ�� 3 ��' : 'ÿ�� 5 ��',
-            duration: 'ÿ�� 30 ����',
-            intensity: hasChronic ? '��ǿ���������ϸ��������' : '�е�ǿ��������ѭ�򽥽�',
-            cautions: '��������������������˶�ǰ���� 10 ���ӡ���������ͷ������ֹͣ��',
+            frequency: hasChronic ? '每周 3 次' : '每周 5 次',
+            duration: '每次 30 分钟',
+            intensity: hasChronic ? '低强度有氧，严格控制心率' : '中低强度有氧，循序渐进',
+            cautions: '避免剧烈弯腰、憋气；运动前热身 10 分钟。出现胸闷头晕立即停止。',
             createdAt: new Date().toISOString()
         };
     },
@@ -93,11 +93,11 @@ const storage = {
         const val = lsGet(KEYS.CONTACTS, null);
         if (val && Array.isArray(val)) return val;
         return [
-            { name: 'Ů��', avatar: '??', bg: 'orange', time: '�ո�', phone: '13800001234' },
-            { name: '����', avatar: '??', bg: '', time: '10:25', phone: '13900005678' },
-            { name: '����', avatar: '??', bg: 'orange', time: '����', phone: '13800000001' },
-            { name: '������', avatar: '?????', bg: '', time: '����', phone: '13800000002' },
-            { name: '��ʯ������', avatar: '??', bg: '', time: '2 ��ǰ', phone: '' }
+            { name: '女儿', avatar: '👩', bg: 'orange', time: '刚刚', phone: '13800001234' },
+            { name: '儿子', avatar: '👨', bg: '', time: '10:25', phone: '13900005678' },
+            { name: '老李', avatar: '👴', bg: 'orange', time: '昨天', phone: '13800000001' },
+            { name: '王教练', avatar: '🧑‍🏫', bg: '', time: '昨天', phone: '13800000002' },
+            { name: '黑石礁社区', avatar: '🏘', bg: '', time: '2 天前', phone: '' }
         ];
     },
     getHealthData() {
@@ -125,7 +125,7 @@ const storage = {
     }
 };
 
-// ========== ���� ==========
+// ========== 工具 ==========
 function toast(msg, ms = 1600) {
     const t = document.createElement('div');
     t.className = 'toast';
@@ -137,7 +137,7 @@ function toast(msg, ms = 1600) {
         setTimeout(() => t.remove(), 250);
     }, ms);
 }
-function modal({ title, content, showCancel = true, confirmText = 'ȷ��', cancelText = 'ȡ��', confirmColor }) {
+function modal({ title, content, showCancel = true, confirmText = '确定', cancelText = '取消', confirmColor }) {
     return new Promise(resolve => {
         const mask = document.createElement('div');
         mask.className = 'modal-mask';
@@ -160,7 +160,7 @@ function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ========== �ƶ�ͬ�� ==========
+// ========== 云端同步 ==========
 async function syncToCloud() {
     if (!currentUser) return;
     const allData = {};
@@ -171,7 +171,7 @@ async function syncToCloud() {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
             body: JSON.stringify({ allData })
         });
-    } catch(e) { console.warn('ͬ��ʧ��', e); }
+    } catch(e) { console.warn('同步失败', e); }
 }
 async function pullFromCloud() {
     if (!currentUser) return;
@@ -180,13 +180,13 @@ async function pullFromCloud() {
         if (res.ok) {
             const cloud = await res.json();
             for (const k of Object.values(KEYS)) if (cloud[k] !== undefined) lsSet(k, cloud[k]);
-            toast('��ͬ����������');
+            toast('已同步最新数据');
             render();
         } else {
-            console.warn('ͬ��ʧ�ܣ�״̬��', res.status);
+            console.warn('同步失败，状态码', res.status);
         }
     } catch(e) {
-        console.warn('�������ʹ�ñ�������', e);
+        console.warn('网络错误，使用本地数据', e);
     }
 }
 async function loginOrRegister(phone, password, isLogin) {
@@ -198,7 +198,7 @@ async function loginOrRegister(phone, password, isLogin) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    currentUser = { phone, token: data.token, role: data.user.role || "�����û�" };
+    currentUser = { phone, token: data.token, role: data.user.role || "银龄用户" };
     localStorage.setItem('user', JSON.stringify(currentUser));
     await pullFromCloud();
     navigate('home');
@@ -209,15 +209,15 @@ function logout() {
     navigate('login');
 }
 
-// ========== ·�� ==========
+// ========== 路由 ==========
 const TABBAR_PAGES = ['home', 'sport', 'prescription', 'data', 'messages', 'me'];
 const TABBAR_LIST = [
-    { key: 'home', text: '����̨', icon: '??' },
-    { key: 'sport', text: '����', icon: '??' },
-    { key: 'prescription', text: '����', icon: '??' },
-    { key: 'data', text: '����', icon: '??' },
-    { key: 'messages', text: '��Ϣ', icon: '??' },
-    { key: 'me', text: '�ҵ�', icon: '??' }
+    { key: 'home', text: '工作台', icon: '💼' },
+    { key: 'sport', text: '患者', icon: '👥' },
+    { key: 'prescription', text: '处方', icon: '📋' },
+    { key: 'data', text: '数据', icon: '📈' },
+    { key: 'messages', text: '消息', icon: '💬' },
+    { key: 'me', text: '我的', icon: '👤' }
 ];
 const PAGES = {};
 
@@ -271,7 +271,7 @@ function render() {
 }
 window.addEventListener('hashchange', render);
 
-// ========== ҳ�涨�� ==========
+// ========== 页面定义 ==========
 PAGES.index = (app) => {
   // Auto-login: check if user is already logged in
   var savedUser = localStorage.getItem("user");
@@ -288,7 +288,7 @@ PAGES.index = (app) => {
   // Render landing page
   app.innerHTML = '<div class="landing-page">'+
     '<div class="landing-inner">'+
-      '<div class="landing-logo-wrap"><div class="landing-logo-circle"><img src="images/logo-desktop.png" alt="��·���" style="width:110px;height:110px;"></div></div>'+
+      '<div class="landing-logo-wrap"><div class="landing-logo-circle"><img src="images/logo-desktop.png" alt="颐路相伴" style="width:110px;height:110px;"></div></div>'+
       '<div class="landing-title">\u9890\u8DEF\u76F8\u4F34</div>'+
       '<div class="landing-subtitle">\u94F6\u9F84\u8FD0\u52A8\u5065\u5EB7\u667A\u6167\u5E73\u53F0</div>'+
       '<div class="landing-subtitle second">\u966A\u60A8\u8D70\u597D\u6BCF\u4E00\u6B65\u5065\u5EB7\u4E4B\u8DEF</div>'+
@@ -314,23 +314,23 @@ PAGES.login = (app) => {
 PAGES.register = (app, initialLogin) => {
   let isLogin = initialLogin === true;
   const renderForm = () => {
-    app.innerHTML = '<div class="container" style="margin-top:40px;"><div class="card"><div class="card-title">'+(isLogin?'��¼':'ע��')+'</div>'+
-      '<div class="form-row"><div class="form-label">�ֻ���</div><input id="phone" class="form-input" placeholder="11λ�ֻ���" /></div>'+
-      '<div class="form-row"><div class="form-label">����</div><input id="password" type="password" class="form-input" placeholder="����" /></div>'+
-      (!isLogin?'<div class="form-row"><div class="form-label">ѡ������</div><select id="role-select" class="form-input"><option value="�����û�">�����û�</option><option value="ҽ����Ӫ��ʦ">ҽ����Ӫ��ʦ</option><option value="��ŮȺ��">��ŮȺ��</option></select></div>':'')+
-      '<button class="btn btn-primary btn-block" id="submit-btn">'+(isLogin?'��¼':'ע��')+'</button>'+
-      '<div class="text-muted mt-20" style="text-align:center;"><span id="toggle-mode">'+(isLogin?'û���˺ţ�ȥע��':'�����˺ţ�ȥ��¼')+'</span></div>'+
+    app.innerHTML = '<div class="container" style="margin-top:40px;"><div class="card"><div class="card-title">'+(isLogin?'登录':'注册')+'</div>'+
+      '<div class="form-row"><div class="form-label">手机号</div><input id="phone" class="form-input" placeholder="11位手机号" /></div>'+
+      '<div class="form-row"><div class="form-label">密码</div><input id="password" type="password" class="form-input" placeholder="密码" /></div>'+
+      (!isLogin?'<div class="form-row"><div class="form-label">选择身份</div><select id="role-select" class="form-input"><option value="银龄用户">银龄用户</option><option value="医生与营养师">医生与营养师</option><option value="子女群体">子女群体</option></select></div>':'')+
+      '<button class="btn btn-primary btn-block" id="submit-btn">'+(isLogin?'登录':'注册')+'</button>'+
+      '<div class="text-muted mt-20" style="text-align:center;"><span id="toggle-mode">'+(isLogin?'没有账号？去注册':'已有账号？去登录')+'</span></div>'+
     '</div></div>';
     app.querySelector('#submit-btn').onclick = async () => {
       const phone = app.querySelector('#phone').value.trim();
       const pwd = app.querySelector('#password').value.trim();
-      if (!phone || !pwd) { toast("����д����"); return; }
+      if (!phone || !pwd) { toast("请填写完整"); return; }
       try {
         if (isLogin) {
           await loginOrRegister(phone, pwd, true);
         } else {
           var sel = document.getElementById("role-select");
-          var role = sel ? sel.value : "��ͨ�û�";
+          var role = sel ? sel.value : "普通用户";
           await registerWithRole(phone, pwd, role);
         }
       } catch(e) { toast(e.message); }
@@ -353,51 +353,51 @@ async function registerWithRole(phone, password, role) {
   navigate("home");
 }
 
-// ������ҳ (ͼƬ·��������)
+// 健康首页 (图片路径已修正)
 PAGES.home = (app) => {
-    setNavTitle('����̨');
+    setNavTitle('工作台');
     const p = storage.getProfile();
-    const name = (p && p.name) ? p.name : 'ҽʦ';
+    const name = (p && p.name) ? p.name : '医师';
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">����̨</div><div class="header-subtitle">���ã�${escapeHtml(name)} �� ���չ���</div></div></div>
-            <div class="banner"><div class="emoji">??</div><div><div class="t">��������</div><div class="s">���޴��죬���ע���߶�̬</div></div></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">工作台</div><div class="header-subtitle">您好，${escapeHtml(name)} · 今日工作</div></div></div>
+            <div class="banner"><div class="emoji">💼</div><div><div class="t">待办事项</div><div class="s">暂无待办，请关注患者动态</div></div></div>
             <div class="grid-2">
-                <div class="feature-tile orange" data-go="sport"><div class="fi">??</div><div class="fn">���߹���</div></div>
-                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">??</div><div class="fn">�鿴����</div></div>
-                <div class="feature-tile purple" data-go="doctor-send-prescription"><div class="fi">??</div><div class="fn">���ʹ���</div></div>
-                <div class="feature-tile blue" data-go="messages"><div class="fi">??</div><div class="fn">��Ϣ</div></div>
+                <div class="feature-tile orange" data-go="sport"><div class="fi">👥</div><div class="fn">患者管理</div></div>
+                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">📊</div><div class="fn">查看数据</div></div>
+                <div class="feature-tile purple" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送处方</div></div>
+                <div class="feature-tile blue" data-go="messages"><div class="fi">💬</div><div class="fn">消息</div></div>
             </div>
-            <div class="card"><div class="card-title">?? �󶨻���</div>
-                <div class="form-row"><input id="bind-patient-input" class="form-input" placeholder="���뻼���ֻ���" style="flex:1;" /><button class="btn btn-primary" id="bind-patient-btn" style="padding:6px 12px;">��</button></div>
+            <div class="card"><div class="card-title">📋 绑定患者</div>
+                <div class="form-row"><input id="bind-patient-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="bind-patient-btn" style="padding:6px 12px;">绑定</button></div>
                 <div id="bind-result"></div>
-                <div id="bound-patients"><div class="text-muted" style="text-align:center;padding:12px;" id="no-patients-msg">���ް󶨻���</div></div>
+                <div id="bound-patients"><div class="text-muted" style="text-align:center;padding:12px;" id="no-patients-msg">暂无绑定患者</div></div>
             </div>
-            <div class="card"><div class="card-title">����ͳ��</div><div id="work-stat"><div class="text-muted" style="text-align:center;padding:12px;">���ӷ�������ɲ鿴ͳ������</div></div></div>
+            <div class="card"><div class="card-title">快速统计</div><div id="work-stat"><div class="text-muted" style="text-align:center;padding:12px;">连接服务器后可查看统计数据</div></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
     renderBoundPatients(app);
     loadTodayStats(app);
     app.querySelector('#bind-patient-btn').onclick = function(){
         var phone = app.querySelector('#bind-patient-input').value.trim();
-        if(!phone){ toast('�������ֻ���'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
-        app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">������...</div>';
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">搜索中...</div>';
         fetch(API_BASE+'/api/user/search?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}})
           .then(function(r){return r.json();})
           .then(function(d){
             if(d.user){
               var patients = JSON.parse(localStorage.getItem('dr_patients')||'[]');
-              if(patients.some(function(p){return p.phone===phone;})){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--orange);">�û����Ѱ�</div>'; return; }
-              patients.push({phone:phone, name:d.user.name||'δ����'});
+              if(patients.some(function(p){return p.phone===phone;})){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--orange);">该患者已绑定</div>'; return; }
+              patients.push({phone:phone, name:d.user.name||'未命名'});
               localStorage.setItem('dr_patients', JSON.stringify(patients));
-              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:green;">�󶨳ɹ�</div>';
+              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:green;">绑定成功</div>';
               renderBoundPatients(app);
             } else {
-              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">δ�ҵ����û�</div>';
+              app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该用户</div>';
             }
           })
-          .catch(function(){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">����ʧ��</div>'; });
+          .catch(function(){ app.querySelector('#bind-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">搜索失败</div>'; });
     };
 };
 
@@ -407,7 +407,7 @@ function renderBoundPatients(app) {
     var noMsg = app.querySelector('#no-patients-msg');
     if(!container) return;
     if(patients.length === 0) {
-        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">���ް󶨻���</div>';
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无绑定患者</div>';
         return;
     }
     container.innerHTML = patients.map(function(p){
@@ -416,48 +416,48 @@ function renderBoundPatients(app) {
 }
 
 PAGES.sport = (app) => {
-    setNavTitle('���߹���');
+    setNavTitle('患者管理');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">���߹���</div><div class="header-subtitle">�鿴�͹������Ļ���</div></div></div>
-            <div class="card"><div class="card-title">��������</div>
-                <div class="form-row"><input id="patient-search-input" class="form-input" placeholder="���뻼���ֻ���" style="flex:1;" /><button class="btn btn-primary" id="patient-search-btn" style="padding:6px 12px;">����</button></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">患者管理</div><div class="header-subtitle">查看和管理您的患者</div></div></div>
+            <div class="card"><div class="card-title">搜索患者</div>
+                <div class="form-row"><input id="patient-search-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="patient-search-btn" style="padding:6px 12px;">搜索</button></div>
                 <div id="patient-search-result"></div>
             </div>
             <div class="grid-2">
-                <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">??</div><div class="fn">�鿴�û�����</div></div>
-                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">??</div><div class="fn">�����˶�����</div></div><div class="feature-tile purple" data-go="patient-records"><div class="fi">??</div><div class="fn">���Ƶ���</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">??</div><div class="fn">���ܴ�������</div></div>
+                <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看用户数据</div></div>
+                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div><div class="feature-tile purple" data-go="patient-records"><div class="fi">📋</div><div class="fn">诊疗档案</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
             </div>
-            <div class="card"><div class="card-title">�����ϵ�Ļ���</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">���޼�¼</div></div></div>
+            <div class="card"><div class="card-title">最近联系的患者</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">暂无记录</div></div></div>
         </div>`;
     app.querySelector('#patient-search-btn').onclick = function(){
         var phone = app.querySelector('#patient-search-input').value.trim();
-        if(!phone){ toast('�������ֻ���'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
         fetch(API_BASE+'/api/user/search?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}})
           .then(function(r){return r.json();})
           .then(function(d){
             if(d.user){
-              app.querySelector('#patient-search-result').innerHTML = '<div class="form-row" style="border:none;"><span>??</span><div style="flex:1;"><div>'+escapeHtml(d.user.name||'')+'</div><div class="text-muted" style="font-size:12px;">'+escapeHtml(phone)+'</div></div><button class="btn btn-sm btn-primary" data-phone="'+phone+'">�鿴����</button></div>';
+              app.querySelector('#patient-search-result').innerHTML = '<div class="form-row" style="border:none;"><span>👤</span><div style="flex:1;"><div>'+escapeHtml(d.user.name||'')+'</div><div class="text-muted" style="font-size:12px;">'+escapeHtml(phone)+'</div></div><button class="btn btn-sm btn-primary" data-phone="'+phone+'">查看数据</button></div>';
             } else {
-              app.querySelector('#patient-search-result').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">δ�ҵ����û�</div>';
+              app.querySelector('#patient-search-result').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">未找到该用户</div>';
             }
           })
-          .catch(function(){ toast('����ʧ��'); });
+          .catch(function(){ toast('搜索失败'); });
     };
 };
 
 PAGES.data = (app) => {
-    setNavTitle('���ݿ���');
+    setNavTitle('数据看板');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">���ݿ���</div><div class="header-subtitle">�鿴���ߵ�ʵʱ��������</div></div></div>
-            <div class="card"><div class="card-title">ѡ����</div>
-                <div class="form-row"><input id="dash-phone" class="form-input" placeholder="���뻼���ֻ���" style="flex:1;" /><button class="btn btn-primary" id="dash-search-btn" style="padding:6px 12px;">����</button></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">数据看板</div><div class="header-subtitle">查看患者的实时健康数据</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="dash-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="dash-search-btn" style="padding:6px 12px;">搜索</button></div>
             </div>
             <div id="dash-refresh-bar" style="display:none;text-align:right;font-size:12px;color:var(--gray);margin-bottom:4px;">
-                <span id="dash-update-time">\u2014</span>
-                <button class="btn btn-ghost" id="dash-refresh-btn" style="padding:2px 6px;font-size:11px;">\uD83D\uDD04 \u5237\u65B0</button>
+                <span id="dash-update-time">—</span>
+                <button class="btn btn-ghost" id="dash-refresh-btn" style="padding:2px 6px;font-size:11px;">🔄 刷新</button>
             </div>
             <div id="dash-content"></div>
         </div>`;
@@ -470,54 +470,575 @@ var dashRefreshTimer = null;
 
 async function loadDashData(app) {
     var phone = app.querySelector('#dash-phone').value.trim();
-    if(!phone){ toast('�������ֻ���'); return; }
-    if(!currentUser){ toast('���ȵ�¼'); return; }
-    app.querySelector('#dash-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">\u67E5\u8BE2\u4E2D...</div>';
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    app.querySelector('#dash-content').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">查询中...</div>';
     try {
         var res = await fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
         var d = await res.json();
         if(!d.patient){
-            app.querySelector('#dash-content').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">\uD83D\uDC64</div><div class="text-muted">\u672A\u627E\u5230\u8BE5\u60A3\u8005</div></div>';
-            return;
+            app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">👤</div><div class="text-muted">未找到该患者</div></div>'; return;
         }
         var records = d.dailyRecords || {};
         var today = new Date().toISOString().slice(0,10);
         var h = records[today] || {};
-        var name = d.patient.name || '\u672A\u8BBE\u7F6E';
-        var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">\uD83D\uDC64</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(name)+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+' \u00B7 \u4ECA\u65E5\u5065\u5EB7\u6570\u636E</div></div></div></div>';
-        html += '<div class="card" style="margin-bottom:8px;"><div class="card-title">\uD83D\uDCCA \u4ECA\u65E5\u5065\u5EB7\u6307\u6807</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
-            '<div class="info-pill green"><div class="fs-28 fw-600">'+(h.heartRate||'\u2014')+'</div><div style="font-size:12px;">\u5FC3\u7387 (\u6B21/\u5206)</div></div>' +
-            '<div class="info-pill orange"><div class="fs-28 fw-600">'+(h.bloodPressure||'\u2014')+'</div><div style="font-size:12px;">\u8840\u538B (mmHg)</div></div>' +
-            '<div class="info-pill purple"><div class="fs-28 fw-600">'+(h.bloodOxygen||'\u2014')+'</div><div style="font-size:12px;">\u8840\u6C27 (%)</div></div>' +
-            '<div class="info-pill blue"><div class="fs-28 fw-600">'+(h.bloodSugar||'\u2014')+'</div><div style="font-size:12px;">\u8840\u7CD6 (mmol/L)</div></div>' +
-            '<div class="info-pill" style="background:#fef3c7;"><div class="fs-28 fw-600">'+(h.steps||'\u2014')+'</div><div style="font-size:12px;">\u6B65\u6570</div></div>' +
-            '<div class="info-pill" style="background:#ede9fe;"><div class="fs-28 fw-600">'+(h.sleepHours||'\u2014')+'</div><div style="font-size:12px;">\u7761\u7720 (\u5C0F\u65F6)</div></div>' +
+        var name = d.patient.name || '未设置';
+        var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">👤</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(name)+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+' · 今日健康数据</div></div></div></div>';
+        html += '<div class="card" style="margin-bottom:8px;"><div class="card-title">📊 今日健康指标</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+            '<div class="info-pill green"><div class="fs-28 fw-600">'+(h.heartRate||'—')+'</div><div style="font-size:12px;">心率 (次/分)</div></div>' +
+            '<div class="info-pill orange"><div class="fs-28 fw-600">'+(h.bloodPressure||'—')+'</div><div style="font-size:12px;">血压 (mmHg)</div></div>' +
+            '<div class="info-pill purple"><div class="fs-28 fw-600">'+(h.bloodOxygen||'—')+'</div><div style="font-size:12px;">血氧 (%)</div></div>' +
+            '<div class="info-pill blue"><div class="fs-28 fw-600">'+(h.bloodSugar||'—')+'</div><div style="font-size:12px;">血糖 (mmol/L)</div></div>' +
+            '<div class="info-pill" style="background:#fef3c7;"><div class="fs-28 fw-600">'+(h.steps||'—')+'</div><div style="font-size:12px;">步数</div></div>' +
+            '<div class="info-pill" style="background:#ede9fe;"><div class="fs-28 fw-600">'+(h.sleepHours||'—')+'</div><div style="font-size:12px;">睡眠 (小时)</div></div>' +
             '</div></div>';
-        html += '<button class="btn btn-ghost btn-block" onclick="navigate(\'patient-records\')">\uD83D\uDCCB \u67E5\u770B\u8BCA\u7597\u6863\u6848</button>';
+        html += '<button class="btn btn-ghost btn-block" onclick="navigate(\'patient-records\')">📋 查看诊疗档案</button>';
         app.querySelector('#dash-content').innerHTML = html;
-        
-        // Update refresh time + auto-refresh
         var now = new Date();
         app.querySelector('#dash-refresh-bar').style.display = 'block';
-        app.querySelector('#dash-update-time').textContent = '\u6700\u8FD1\u66F4\u65B0: '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+        app.querySelector('#dash-update-time').textContent = '最近更新: '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
         if(dashRefreshTimer) clearInterval(dashRefreshTimer);
         dashRefreshTimer = setInterval(function(){
             if(!document.getElementById('dash-phone')||!document.getElementById('dash-phone').value.trim()){ clearInterval(dashRefreshTimer); dashRefreshTimer = null; return; }
             loadDashData(app);
         }, 30000);
     } catch(e){
-        app.querySelector('#dash-content').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">\u26A0\uFE0F</div><div class="text-muted" style="color:var(--red);">\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC</div></div>';
+        app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">⚠️</div><div class="text-muted" style="color:var(--red);">加载失败，请检查网络</div></div>';
     }
+}
+
+function loadTrends(app) {
+    var phone = app.querySelector('#trend-phone').value.trim();
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    var period = 'week';
+    var activeBtn = app.querySelector('#trend-period-bar .btn-primary');
+    if(activeBtn) period = activeBtn.getAttribute('data-period') || 'week';
+    currentPhone = phone;
+    app.querySelector('#trend-period-bar').style.display = 'flex';
+    app.querySelector('#report-section').style.display = 'block';
+    app.querySelector('#trend-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">加载中...</div>';
+    // Setup period buttons
+    app.querySelectorAll('#trend-period-bar .btn').forEach(function(btn){
+        btn.onclick = function(){
+            app.querySelectorAll('#trend-period-bar .btn').forEach(function(b){ b.className = 'btn btn-sm'; });
+            this.className = 'btn btn-sm btn-primary';
+            loadTrends(app);
+        };
+    });
+    fetch(API_BASE+'/api/doctor/patient-trends/'+encodeURIComponent(phone)+'?period='+period, {headers:{Authorization:'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            var now = new Date();
+                var timeStr = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+                var rt = app.querySelector('#trend-refresh-time');
+                if(rt) rt.textContent = '最近更新: '+timeStr;
+                // Auto-refresh every 30 seconds
+                if(trendRefreshTimer) clearInterval(trendRefreshTimer);
+                trendRefreshTimer = setInterval(function(){
+                    var phoneEl = document.getElementById('trend-phone');
+                    if(!phoneEl){ clearInterval(trendRefreshTimer); trendRefreshTimer = null; return; }
+                    loadTrends(app);
+                }, 30000);
+            if(d.trends && d.trends.dates && d.trends.dates.length){
+                renderTrendChart(app, '心率 (次/分)', d.trends.dates, d.trends.heartRate, '#ff6b35', 50, 120);
+                renderTrendChart(app, '血糖 (mmol/L)', d.trends.dates, d.trends.bloodSugar, '#22c55e', 3, 10);
+                renderTrendChart(app, '步数', d.trends.dates, d.trends.steps, '#3b82f6', 0, 10000);
+                renderTrendChart(app, '睡眠 (小时)', d.trends.dates, d.trends.sleepHours, '#8b5cf6', 0, 12);
+            } else {
+                app.querySelector('#trend-content').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">📊</div><div class="text-muted">该患者暂无健康数据</div></div>';
+            }
+        })
+        .catch(function(){ app.querySelector('#trend-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">加载失败</div>'; });
+}
+
+function renderTrendChart(app, label, dates, values, color, min, max) {
+    var container = app.querySelector('#trend-content');
+    var maxVal = max || Math.max.apply(null, values.filter(function(v){return v!==null;})) || 100;
+    var minVal = min || 0;
+    var range = maxVal - minVal || 1;
+    var bars = values.map(function(v,i){
+        if(v === null) return '<div style="width:'+(100/values.length-2)+'%;height:2px;background:#eee;border-radius:2px;margin:0 1px;align-self:flex-end;"></div>';
+        var h = Math.max(3, ((v-minVal)/range)*100);
+        var dateLabel = dates[i] ? dates[i].slice(5) : '';
+        return '<div style="display:flex;flex-direction:column;align-items:center;width:'+(100/values.length-1)+'%;"><div style="width:80%;height:'+h+'px;background:'+color+';border-radius:4px 4px 0 0;transition:height 0.3s;min-height:3px;"></div><div style="font-size:10px;color:var(--gray);margin-top:2px;">'+dateLabel+'</div></div>';
+    }).join('');
+    var currentValue = values[values.length-1];
+    var valueText = currentValue !== null && currentValue !== undefined ? currentValue : '--';
+    container.insertAdjacentHTML('beforeend',
+        '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div><div style="font-weight:600;font-size:15px;">'+label+'</div></div><div style="font-size:24px;font-weight:700;color:'+color+';">'+valueText+'</div></div><div style="display:flex;align-items:flex-end;height:120px;padding:4px 0;">'+bars+'</div></div>'
+    );
+}
+
+async function generateReport(app, phone, period) {
+    if(!phone){ toast('请先搜索患者'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    var container = app.querySelector('#report-content');
+    container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">生成中...</div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/generate-report', {
+            method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+            body:JSON.stringify({phone:phone, period:period})
+        });
+        var d = await res.json();
+        if(d.ok && d.report){
+            var r = d.report;
+            var title = period === 'month' ? '月度康复报告' : '季度康复报告';
+            container.innerHTML = '<div style="border:1px solid var(--orange-light);border-radius:12px;padding:12px;margin-top:8px;">' +
+                '<div style="font-weight:600;font-size:16px;margin-bottom:8px;">'+title+'</div>' +
+                '<div style="font-size:13px;color:var(--gray);margin-bottom:8px;">'+(r.startDate||'')+' ~ '+(r.endDate||'')+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>📊 健康指标总结</strong><br>'+escapeHtml(r.summary)+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>⚠️ 存在问题</strong><br>'+escapeHtml(r.problems)+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>📋 下一步康复计划</strong><br>'+escapeHtml(r.nextPlan).replace(/\n/g,'<br>')+'</div>' +
+                '<button class="btn btn-primary btn-block" id="send-report-btn" style="margin-top:8px;">📤 发送报告给患者</button></div>';
+            app.querySelector('#send-report-btn').onclick = async function(){
+                try {
+                    var sr = await fetch(API_BASE+'/api/doctor/send-report', {
+                        method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                        body:JSON.stringify({patientPhone:phone, report:r})
+                    });
+                    var sd = await sr.json();
+                    if(sd.ok) toast('报告已通过消息发送给患者'); else toast(sd.error||'发送失败');
+                } catch(e){ toast('网络错误'); }
+            };
+        } else {
+            container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">'+(d.error||'生成失败')+'</div>';
+        }
+    } catch(e){
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">生成失败</div>';
+    }
+}
+
+
+PAGES['doctor-patient-data'] = (app, params) => {
+    setNavTitle('查看用户数据');
+    app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">👥</div><div><div class="t">老年用户健康数据</div><div class="s">输入手机号查看用户的运动健康记录</div></div></div>' +
+      '<div class="card"><div class="card-title">搜索用户</div>' +
+      '<div class="form-row"><input id="patient-search-input" class="form-input" placeholder="输入用户手机号" style="flex:1;" /><button class="btn btn-primary" id="patient-search-btn" style="padding:6px 12px;">搜索</button></div>' +
+      '<div id="patient-info"></div></div>' +
+      '<div id="patient-data-card" class="card" style="display:none;"><div class="card-title">健康数据记录</div>' +
+      '<div class="tab-bar" id="data-tab-bar" style="display:flex;gap:4px;margin-bottom:8px;">' +
+        '<button class="btn btn-primary" id="tab-today" style="flex:1;font-size:13px;padding:6px;">今日数据</button>' +
+        '<button class="btn btn-secondary" id="tab-week" style="flex:1;font-size:13px;padding:6px;">近7天</button>' +
+        '<button class="btn btn-secondary" id="tab-month" style="flex:1;font-size:13px;padding:6px;">近30天</button>' +
+      '</div><div id="patient-data-content"><div class="text-muted" style="text-align:center;padding:15px;">请先搜索用户</div></div></div>' +
+      '<button class="btn btn-ghost btn-block" id="back-from-patient-data" style="margin-top:8px;">← 返回</button></div>';
+    
+    var currentPatientPhone = '';
+    var patientDailyRecords = {};
+    
+    
+    // Auto-search if phone param provided
+    if(params && params.phone){
+        document.getElementById('patient-search-input').value = params.phone;
+        setTimeout(searchPatient, 100);
+    }
+    app.querySelector('#back-from-patient-data').onclick = function() { navigate('home'); };
+    
+    app.querySelector('#patient-search-btn').onclick = searchPatient;
+    document.getElementById('patient-search-input').onkeypress = function(e) { if(e.key==='Enter') searchPatient(); };
+    
+    async function searchPatient() {
+      var phone = document.getElementById('patient-search-input').value.trim();
+      if(!phone) { toast('请输入手机号'); return; }
+      if(!currentUser) { toast('请先登录'); return; }
+      
+      document.getElementById('patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">搜索中...</div>';
+      document.getElementById('patient-data-card').style.display = 'none';
+      
+      try {
+        var res = await fetch(API_BASE + '/api/doctor/patient-data?phone=' + encodeURIComponent(phone), {
+          headers: { Authorization: 'Bearer ' + currentUser.token }
+        });
+        var data = await res.json();
+        
+        if(!res.ok) {
+          document.getElementById('patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--red);">' + (data.error || '查询失败') + '</div>';
+          return;
+        }
+        
+        currentPatientPhone = data.patient.phone;
+        patientDailyRecords = data.dailyRecords || {};
+        
+        var roleLabel = data.patient.role || '普通用户';
+        if(roleLabel === '银龄用户') roleLabel = '老年端用户';
+        else if(roleLabel === '子女群体') roleLabel = '子女端用户';
+        
+        document.getElementById('patient-info').innerHTML = 
+          '<div class="form-row" style="border:1px solid var(--orange-light);border-radius:8px;padding:10px;margin-top:8px;">' +
+          '<div class="avatar orange">👤</div>' +
+          '<div style="flex:1;"><div style="font-weight:600;font-size:16px;">' + (data.patient.name || '未设置昵称') + '</div>' +
+          '<div style="font-size:13px;color:var(--gray);">' + escapeHtml(phone) + ' · ' + roleLabel + '</div>' +
+          '<div style="font-size:12px;color:var(--gray);">共 ' + (data.recordCount || 0) + ' 条记录</div></div></div>';
+        
+        document.getElementById('patient-data-card').style.display = 'block';
+        showTodayData();
+      } catch(e) {
+        document.getElementById('patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--red);">网络错误</div>';
+        toast('网络错误');
+      }
+    }
+    
+    function showTodayData() {
+      var today = new Date().toISOString().slice(0,10);
+      var record = patientDailyRecords[today];
+      if(!record) {
+        document.getElementById('patient-data-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:15px;">今日暂无数据记录</div>';
+        return;
+      }
+      document.getElementById('patient-data-content').innerHTML =
+        '<div style="padding:8px;"><div style="font-weight:600;color:var(--orange);margin-bottom:8px;">' + today + ' 的数据</div>' +
+        '<div class="form-row"><span class="tag" style="min-width:70px;">血压</span><span>' + escapeHtml(record.bp || '--') + ' mmHg</span></div>' +
+        '<div class="form-row"><span class="tag" style="min-width:70px;">心率</span><span>' + escapeHtml(record.heartRate || '--') + ' 次/分</span></div>' +
+        '<div class="form-row"><span class="tag" style="min-width:70px;">血氧</span><span>' + escapeHtml(record.bloodOxygen || '--') + ' %</span></div>' +
+        '<div class="form-row"><span class="tag" style="min-width:70px;">血糖</span><span>' + escapeHtml(record.bloodSugar || '--') + ' mmol/L</span></div>' +
+        '<div class="form-row"><span class="tag" style="min-width:70px;">步数</span><span>' + escapeHtml(record.steps || '--') + ' 步</span></div>' +
+        '<div class="form-row" style="border:none;"><span class="tag" style="min-width:70px;">睡眠</span><span>' + escapeHtml(record.sleep || '--') + ' 小时</span></div></div>';
+      
+      document.getElementById('tab-today').className = 'btn btn-primary';
+      document.getElementById('tab-week').className = 'btn btn-secondary';
+      document.getElementById('tab-month').className = 'btn btn-secondary';
+    }
+    
+    function calcAvg(arr) {
+      if(!arr || arr.length === 0) return '--';
+      var sum = arr.reduce(function(a, b) { return a + (parseFloat(b) || 0); }, 0);
+      return (sum / arr.length).toFixed(1);
+    }
+    
+    function showWeekData() {
+      var records = [];
+      for(var i = 0; i < 7; i++) {
+        var d = new Date();
+        d.setDate(d.getDate() - i);
+        var ds = d.toISOString().slice(0,10);
+        if(patientDailyRecords[ds]) records.push({date: ds, data: patientDailyRecords[ds]});
+      }
+      if(records.length === 0) {
+        document.getElementById('patient-data-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:15px;">近7天暂无数据</div>';
+        return;
+      }
+      var bpArr = [], hrArr = [], oxArr = [], bsArr = [], stArr = [], slArr = [];
+      var detailHtml = records.map(function(r) {
+        bpArr.push(r.data.bp); hrArr.push(r.data.heartRate); oxArr.push(r.data.bloodOxygen);
+        bsArr.push(r.data.bloodSugar); stArr.push(r.data.steps); slArr.push(r.data.sleep);
+        return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0;">' +
+          '<span style="font-weight:600;">' + r.date + '</span>: 血压 ' + (r.data.bp || '--') + ' | 心率 ' + (r.data.heartRate || '--') + ' | 步数 ' + (r.data.steps || '--') + '</div>';
+      }).join('');
+      
+      document.getElementById('patient-data-content').innerHTML =
+        '<div style="padding:8px;"><div style="font-weight:600;color:var(--green);margin-bottom:8px;">近7天汇总 (共' + records.length + '条记录)</div>' +
+        '<div class="form-row"><span class="tag">平均血压</span><span>' + calcAvg(bpArr) + ' mmHg</span></div>' +
+        '<div class="form-row"><span class="tag">平均心率</span><span>' + calcAvg(hrArr) + ' 次/分</span></div>' +
+        '<div class="form-row"><span class="tag">平均血氧</span><span>' + calcAvg(oxArr) + ' %</span></div>' +
+        '<div style="margin-top:8px;padding:8px;background:#f9f9f9;border-radius:6px;">' +
+        '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">详细记录</div>' + detailHtml + '</div></div>';
+      
+      document.getElementById('tab-today').className = 'btn btn-secondary';
+      document.getElementById('tab-week').className = 'btn btn-primary';
+      document.getElementById('tab-month').className = 'btn btn-secondary';
+    }
+    
+    function showMonthData() {
+      var records = [];
+      for(var i = 0; i < 30; i++) {
+        var d = new Date();
+        d.setDate(d.getDate() - i);
+        var ds = d.toISOString().slice(0,10);
+        if(patientDailyRecords[ds]) records.push({date: ds, data: patientDailyRecords[ds]});
+      }
+      if(records.length === 0) {
+        document.getElementById('patient-data-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:15px;">近30天暂无数据</div>';
+        return;
+      }
+      var bpArr = [], hrArr = [], oxArr = [], bsArr = [], stArr = [], slArr = [];
+      records.forEach(function(r) {
+        bpArr.push(r.data.bp); hrArr.push(r.data.heartRate); oxArr.push(r.data.bloodOxygen);
+        bsArr.push(r.data.bloodSugar); stArr.push(r.data.steps); slArr.push(r.data.sleep);
+      });
+      // Calculate percentage of days with data
+      var pct = Math.round(records.length / 30 * 100);
+      
+      document.getElementById('patient-data-content').innerHTML =
+        '<div style="padding:8px;"><div style="font-weight:600;color:var(--green);margin-bottom:8px;">' +
+        '近30天汇总 (共' + records.length + '天有记录, ' + pct + '%)</div>' +
+        '<div class="form-row"><span class="tag">平均血压</span><span>' + calcAvg(bpArr) + ' mmHg</span></div>' +
+        '<div class="form-row"><span class="tag">平均心率</span><span>' + calcAvg(hrArr) + ' 次/分</span></div>' +
+        '<div class="form-row"><span class="tag">平均血氧</span><span>' + calcAvg(oxArr) + ' %</span></div>' +
+        '<div class="form-row"><span class="tag">平均血糖</span><span>' + calcAvg(bsArr) + ' mmol/L</span></div>' +
+        '<div class="form-row"><span class="tag">平均步数</span><span>' + calcAvg(stArr) + ' 步</span></div>' +
+        '<div class="form-row" style="border:none;"><span class="tag">平均睡眠</span><span>' + calcAvg(slArr) + ' 小时</span></div></div>';
+      
+      document.getElementById('tab-today').className = 'btn btn-secondary';
+      document.getElementById('tab-week').className = 'btn btn-secondary';
+      document.getElementById('tab-month').className = 'btn btn-primary';
+    }
+    
+    document.getElementById('tab-today').onclick = showTodayData;
+    document.getElementById('tab-week').onclick = showWeekData;
+    document.getElementById('tab-month').onclick = showMonthData;
+};
+
+PAGES['doctor-send-prescription'] = (app) => {
+    setNavTitle('发送运动处方');
+    if(currentUser){
+        fetch(API_BASE+'/api/qualification/certified',{headers:{Authorization:'Bearer '+currentUser.token}})
+            .then(function(r){return r.json();})
+            .then(function(d){
+                if(!d.certified){
+                    app.innerHTML = '<div class="container"><div class="card" style="text-align:center;padding:30px;"><div style="font-size:48px;margin-bottom:12px;">\uD83D\uDD12</div><div style="font-size:18px;font-weight:600;margin-bottom:8px;">未完成资质认证</div><div style="color:var(--gray);margin-bottom:20px;">您需要上传执业医师证或相关资质证书，经管理员审核后方可给患者开方</div><button class="btn btn-primary" onclick="navigate(\'qualifications\')">去认证</button><button class="btn btn-ghost" onclick="navigate(\'home\')">返回</button></div></div>';
+                }
+            });
+    }
+    setNavTitle('发送运动处方');
+    var selectedPatientPhone = '';
+    var selectedPatientName = '';
+    var items = [{icon:'🏃',name:'',detail:''}];
+    
+    app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">📋</div><div><div class="t">发送运动处方</div><div class="s">选择老年用户并制定个性化运动处方</div></div></div>' +
+      '<div class="card"><div class="card-title">选择接收用户</div>' +
+      '<div class="form-row"><input id="rx-patient-input" class="form-input" placeholder="输入用户手机号" style="flex:1;" /><button class="btn btn-primary" id="rx-search-btn" style="padding:6px 12px;">搜索</button></div>' +
+      '<div id="rx-patient-info"></div></div>' +
+      '<div id="rx-form-card" class="card" style="display:none;"><div class="card-title">运动处方内容</div>' +
+      '<div class="form-row"><div class="form-label">运动目标</div><input id="rx-goal" class="form-input" placeholder="如：改善心肺功能" /></div>' +
+      '<div class="form-row"><div class="form-label">强度</div><select id="rx-intensity" class="form-input"><option value="低强度">低强度</option><option value="中低强度">中低强度</option><option value="中等强度">中等强度</option><option value="中高强度">中高强度</option><option value="高强度">高强度</option></select></div>' +
+      '<div class="form-row"><div class="form-label">最大心率</div><input id="rx-hr" class="form-input" placeholder="如：100" type="number" /></div>' +
+      '<div class="form-row"><div class="form-label">频率</div><input id="rx-frequency" class="form-input" placeholder="如：每周3-5次" /></div>' +
+      '<div class="form-row"><div class="form-label">每次时长</div><input id="rx-duration" class="form-input" placeholder="如：30-45分钟" /></div>' +
+      '<div class="form-row" style="flex-direction:column;align-items:stretch;"><div class="form-label">训练项目</div><div id="rx-items-list"></div><button class="btn btn-ghost" id="add-item-btn" style="margin-top:4px;font-size:13px;">＋ 添加项目</button></div>' +
+      '<div class="form-row" style="flex-direction:column;align-items:stretch;"><div class="form-label">注意事项</div><textarea id="rx-cautions" class="form-input" rows="2" placeholder="如：运动前需热身5分钟"></textarea></div>' +
+      '<div class="form-row" style="flex-direction:column;align-items:stretch;"><div class="form-label">营养建议</div><textarea id="rx-diet" class="form-input" rows="2" placeholder="如：增加蛋白质摄入"></textarea></div>' +
+      '<div class="form-row" style="flex-direction:column;align-items:stretch;"><div class="form-label">医生备注</div><textarea id="rx-notes" class="form-input" rows="2" placeholder="医生补充说明"></textarea></div></div>' +
+      '<button class="btn btn-primary btn-block" id="rx-send-btn" style="display:none;">📤 发送处方</button>' +
+      '<button class="btn btn-ghost btn-block" id="back-from-rx" style="margin-top:8px;">← 返回</button></div>';
+    
+    app.querySelector('#back-from-rx').onclick = function() { navigate('data'); };
+    renderItems();
+    
+    function renderItems() {
+      var html = items.map(function(item, idx) {
+        return '<div class="item-entry" style="padding:6px;border:1px solid #f0f0f0;border-radius:6px;margin-bottom:6px;">' +
+          '<div style="display:flex;gap:4px;margin-bottom:4px;"><input class="form-input" id="item-icon-' + idx + '" placeholder="图标" value="' + escapeHtml(item.icon) + '" style="width:50px;flex-shrink:0;" /><input class="form-input" id="item-name-' + idx + '" placeholder="项目名称" value="' + escapeHtml(item.name) + '" style="flex:1;" />' +
+          (idx > 0 ? '<button class="btn btn-danger" onclick="removeItem(' + idx + ')" style="padding:4px 8px;font-size:12px;">✕</button>' : '') + '</div>' +
+          '<input class="form-input" id="item-detail-' + idx + '" placeholder="详细说明" value="' + escapeHtml(item.detail) + '" />' +
+        '</div>';
+      }).join('');
+      document.getElementById('rx-items-list').innerHTML = html;
+    }
+    
+    window.removeItem = function(idx) {
+      items.splice(idx, 1);
+      renderItems();
+    };
+    
+    document.getElementById('add-item-btn').onclick = function() {
+      items.push({icon:'🏃',name:'',detail:''});
+      renderItems();
+    };
+    
+    app.querySelector('#rx-search-btn').onclick = searchPatient;
+    document.getElementById('rx-patient-input').onkeypress = function(e) { if(e.key==='Enter') searchPatient(); };
+    
+    async function searchPatient() {
+      var phone = document.getElementById('rx-patient-input').value.trim();
+      if(!phone) { toast('请输入手机号'); return; }
+      if(!currentUser) { toast('请先登录'); return; }
+      
+      document.getElementById('rx-patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">搜索中...</div>';
+      document.getElementById('rx-form-card').style.display = 'none';
+      document.getElementById('rx-send-btn').style.display = 'none';
+      
+      try {
+        var res = await fetch(API_BASE + '/api/user/search?phone=' + encodeURIComponent(phone), {
+          headers: { Authorization: 'Bearer ' + currentUser.token }
+        });
+        var data = await res.json();
+        
+        if(!res.ok || !data.user) {
+          document.getElementById('rx-patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--red);">未找到该用户</div>';
+          return;
+        }
+        
+        var u = data.user;
+        var roleLabel = u.role || '普通用户';
+        if(roleLabel === '银龄用户') roleLabel = '老年端用户';
+        else if(roleLabel === '子女群体') roleLabel = '子女端用户';
+        
+        var nickname = '';
+        try { var pp = typeof u.data === 'object' && u.data ? (u.data.profile || {}) : {}; nickname = pp.name || ''; } catch(e) {}
+        
+        selectedPatientPhone = phone;
+        selectedPatientName = nickname || phone;
+        
+        document.getElementById('rx-patient-info').innerHTML = 
+          '<div class="form-row" style="border:1px solid var(--orange-light);border-radius:8px;padding:10px;margin-top:8px;">' +
+          '<div class="avatar orange">👤</div>' +
+          '<div style="flex:1;"><div style="font-weight:600;font-size:16px;">' + (nickname || '未设置昵称') + ' (' + escapeHtml(phone) + ')</div>' +
+          '<div style="font-size:13px;color:var(--gray);">' + roleLabel + '</div></div></div>';
+        
+        document.getElementById('rx-form-card').style.display = 'block';
+        document.getElementById('rx-send-btn').style.display = 'block';
+      } catch(e) {
+        document.getElementById('rx-patient-info').innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--red);">网络错误</div>';
+        toast('网络错误');
+      }
+    }
+    
+    document.getElementById('rx-send-btn').onclick = async function() {
+      if(!selectedPatientPhone) { toast('请先选择用户'); return; }
+      if(!currentUser) { toast('请先登录'); return; }
+      
+      // Collect items from inputs
+      var itemsCollect = [];
+      for(var i = 0; i < items.length; i++) {
+        var iconEl = document.getElementById('item-icon-' + i);
+        var nameEl = document.getElementById('item-name-' + i);
+        var detailEl = document.getElementById('item-detail-' + i);
+        var itemName = nameEl ? nameEl.value.trim() : '';
+        if(itemName) {
+          itemsCollect.push({
+            icon: iconEl ? iconEl.value.trim() : '🏃',
+            name: itemName,
+            detail: detailEl ? detailEl.value.trim() : ''
+          });
+        }
+      }
+      
+      if(itemsCollect.length === 0) { toast('请至少添加一个训练项目'); return; }
+      
+      var prescription = {
+        goal: document.getElementById('rx-goal').value.trim(),
+        intensity: document.getElementById('rx-intensity').value,
+        maxHeartRate: document.getElementById('rx-hr').value,
+        frequency: document.getElementById('rx-frequency').value.trim(),
+        duration: document.getElementById('rx-duration').value.trim(),
+        items: itemsCollect,
+        cautions: document.getElementById('rx-cautions').value.trim(),
+        dietAdvice: document.getElementById('rx-diet').value.trim()
+      };
+      var doctorNotes = document.getElementById('rx-notes').value.trim();
+      
+      document.getElementById('rx-send-btn').textContent = '⏳ 发送中...';
+      document.getElementById('rx-send-btn').disabled = true;
+      
+      try {
+        var res = await fetch(API_BASE + '/api/doctor/send-prescription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentUser.token },
+          body: JSON.stringify({ patientPhone: selectedPatientPhone, prescription: prescription, doctorNotes: doctorNotes })
+        });
+        var data = await res.json();
+        if(data.ok) {
+          toast('处方已发送至 ' + selectedPatientName + ' ✅');
+          navigate('data');
+        } else {
+          toast(data.error || '发送失败');
+          document.getElementById('rx-send-btn').textContent = '📤 发送处方';
+          document.getElementById('rx-send-btn').disabled = false;
+        }
+      } catch(e) {
+        toast('网络错误');
+        document.getElementById('rx-send-btn').textContent = '📤 发送处方';
+        document.getElementById('rx-send-btn').disabled = false;
+      }
+    };
+};
+PAGES['data-entry'] = (app) => {
+    setNavTitle('录入当日数据');
+    const today = new Date().toISOString().slice(0,10);
+    const existed = storage.getDailyRecord(today) || {};
+    let form = { bp: existed.bp || '120', heartRate: existed.heartRate || '72', steps: existed.steps || '5000', sleep: existed.sleep || '7', bloodOxygen: existed.bloodOxygen || '97', bloodSugar: existed.bloodSugar || '5.5' };
+    const fields = [
+        { key: 'bp', label: '血压', min: 60, max: 220, unit: 'mmHg', step: 1 },
+        { key: 'heartRate', label: '心率', min: 30, max: 220, unit: '次/分', step: 1 },
+        { key: 'steps', label: '步数', min: 0, max: 50000, unit: '步', step: 100 },
+        { key: 'sleep', label: '睡眠时长', min: 0, max: 24, unit: '小时', step: 0.5 },
+        { key: 'bloodOxygen', label: '血氧', min: 60, max: 100, unit: '%', step: 1 },
+        { key: 'bloodSugar', label: '血糖', min: 2, max: 30, unit: 'mmol/L', step: 0.1 }
+    ];
+    let html = '<div class="container"><div class="card"><div class="card-title">' + today + '</div>';
+    fields.forEach(f => {
+        html += '<div class="form-row" style="flex-wrap:wrap;"><div class="form-label" style="width:100%;margin-bottom:4px;">' + f.label + '</div><input type="range" data-f="' + f.key + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" value="' + form[f.key] + '" style="flex:1;"><span class="range-val" data-v="' + f.key + '" style="min-width:50px;text-align:right;font-weight:600;">' + form[f.key] + '</span><span style="width:40px;text-align:right;color:var(--gray);font-size:13px;">' + f.unit + '</span></div>';
+    });
+    html += '</div><button class="btn btn-primary btn-block" id="save-btn">保存</button></div>';
+    app.innerHTML = html;
+    app.querySelectorAll('input[type="range"]').forEach(el => {
+        el.oninput = () => { form[el.dataset.f] = el.value; var sp = app.querySelector('[data-v="' + el.dataset.f + '"]'); if(sp) sp.textContent = el.value; };
+    });
+    app.querySelector('#save-btn').onclick = () => { lsSet(KEYS.HEALTH_DATA,{heartRate:form.heartRate,bloodPressure:form.bp,steps:form.steps,sleepHours:form.sleep,bloodOxygen:form.bloodOxygen,bloodSugar:form.bloodSugar}); storage.saveDailyRecord(today, form);  toast('已保存'); navigate('data'); };
+};
+
+PAGES['data-summary'] = (app) => {
+    setNavTitle('数据总结');
+    var allR = storage.getDailyRecords();
+    var dates = Object.keys(allR).sort();
+    var recent7 = dates.slice(-7);
+    if (recent7.length === 0) {
+        app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div><div class="text-muted" style="text-align:center;padding:40px;">暂无数据，请先录入</div></div><button class="btn btn-ghost btn-block" data-go="data-entry">去录入</button></div>';
+        app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
+        return;
+    }
+    var bpS=0,hrS=0,stS=0,slS=0, bpN=0,hrN=0,stN=0,slN=0;
+    recent7.forEach(function(d){
+        var r = allR[d];
+        if(r.bp && !isNaN(r.bp)){bpS+=+r.bp;bpN++;}
+        if(r.heartRate && !isNaN(r.heartRate)){hrS+=+r.heartRate;hrN++;}
+        if(r.steps && !isNaN(r.steps)){stS+=+r.steps;stN++;}
+        if(r.sleep && !isNaN(r.sleep)){slS+=+r.sleep;slN++;}
+    });
+    var avg = function(s,n){return n?(s/n).toFixed(1):'--';};
+    var rows = [
+        ['血压', avg(bpS,bpN), 'mmHg'],
+        ['心率', avg(hrS,hrN), '次/分'],
+        ['步数', avg(stS,stN), '步'],
+        ['睡眠时长', avg(slS,slN), '小时']
+    ];
+    var listHtml = '';
+    rows.forEach(function(r){listHtml += '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;"><span>'+r[0]+'</span><span style="font-weight:600;color:var(--orange);">'+r[1]+' '+r[2]+'</span></div>';});
+    var dayHtml = '';
+    recent7.slice().reverse().forEach(function(d){var r=allR[d];dayHtml += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>'+d.slice(5)+'</span><span style="font-size:13px;color:var(--gray);">'+(r.bp||'--')+'/'+(r.heartRate||'--')+'/'+(r.steps||'--')+'/'+(r.sleep||'--')+'</span></div>';});
+    app.innerHTML = '<div class="container"><div class="card"><div class="card-title">近7天平均</div>'+listHtml+'<div class="text-muted" style="font-size:12px;margin-top:4px;">基于最近 '+recent7.length+' 天的数据</div></div><div class="card"><div class="card-title">每日记录</div>'+dayHtml+'</div><button class="btn btn-ghost btn-block" data-go="data-entry">录入新数据</button></div>';
+    app.querySelector('[data-go]').onclick = function(){navigate('data-entry');};
+};
+
+// 单聊相关
+const DEFAULT_GREETINGS = { '女儿': [{text:'爸，今天看到您的运动简报啦',mine:false}], '儿子': [{text:'爸，您这两天血压稳定多了',mine:false}] };
+function latestMessageDescapeHtml(name) {
+    const msgs = storage.getMessages(name);
+    if (msgs.length) return msgs[msgs.length-1].text || '';
+    const g = DEFAULT_GREETINGS[name];
+    return g ? g[g.length-1].text : '';
+}
+async function showAddContactModal() {
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = `<div class="modal"><div class="modal-title">添加联系人</div><div style="padding:8px;"><input id="new-name" placeholder="姓名" class="form-input" style="margin-bottom:12px;"><input id="new-avatar" placeholder="头像表情" class="form-input" value="👤"></div><div class="modal-actions"><button class="modal-btn cancel">取消</button><button class="modal-btn confirm" style="color:var(--orange);">添加</button></div></div>`;
+    document.body.appendChild(mask);
+    const nameInput = mask.querySelector('#new-name');
+    const avatarInput = mask.querySelector('#new-avatar');
+    mask.querySelector('.cancel').onclick = () => mask.remove();
+    mask.querySelector('.confirm').onclick = () => {
+        const name = nameInput.value.trim();
+        if (!name) { toast('请填写姓名'); mask.remove(); return; }
+        const contacts = storage.getContacts();
+        if (contacts.some(c => c.name === name)) { toast('联系人已存在'); mask.remove(); return; }
+        contacts.push({ name, avatar: avatarInput.value.trim() || '👤', bg: '', time: '刚刚', phone: '' });
+        lsSet(KEYS.CONTACTS, contacts);
+        if (currentUser) syncToCloud();
+        toast(`已添加联系人 ${name}`);
+        mask.remove();
+        render();
+    };
 }
 PAGES.messages = (app) => {
     const contacts = storage.getContacts();
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">��Ϣ</div><div class="header-subtitle">${contacts.length} λ��ϵ��</div></div><div class="header-add" id="add-contact-btn">��</div></div>
-            <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>??</span><input id="friend-search-input" class="form-input" placeholder="�����ֻ�����������" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">����</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">??</div><div><div class="t">Ⱥ��</div><div class="s">����鿴�ҵ�Ⱥ��</div></div></div>
-            <div class="banner" id="assistant-btn"><div class="emoji">??</div><div><div class="t">��ȫ����</div><div class="s">���ܽ������ʣ�֧��������</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">??</div><div><div class="t">�����㷨</div><div class="s">���ڽ������ݵ�Ӫ���˶�����</div></div></div>
-            <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">?? ��������</div><div id="friend-requests-list"></div></div>
-            <div class="card" id="friends-card" style="display:none;"><div class="card-title">?? �ҵĺ���</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">������...</div></div></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">消息</div><div class="header-subtitle">${contacts.length} 位联系人</div></div><div class="header-add" id="add-contact-btn">＋</div></div>
+            <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>🔍</span><input id="friend-search-input" class="form-input" placeholder="输入手机号搜索好友" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">搜索</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">👥</div><div><div class="t">群聊</div><div class="s">点击查看我的群聊</div></div></div>
+            <div class="banner" id="assistant-btn"><div class="emoji">🤖</div><div><div class="t">安全助手</div><div class="s">智能健康顾问（支持语音）</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">🧠</div><div><div class="t">智能算法</div><div class="s">基于健康数据的营养运动建议</div></div></div>
+            <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">📩 好友请求</div><div id="friend-requests-list"></div></div>
+            <div class="card" id="friends-card" style="display:none;"><div class="card-title">👥 我的好友</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
             <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div></div>`).join('')}</div>
         </div>`;
     app.querySelectorAll('.list-item').forEach(el => el.onclick = () => navigate('chat', { name: el.dataset.name }));
@@ -540,9 +1061,9 @@ PAGES.messages = (app) => {
             d.data.forEach(function(req){
               var nm=req.fromName||req.from;
               html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f2;">';
-              html+='<span>?? '+escapeHtml(nm)+'</span>';
-              html+='<div><button class="btn btn-primary" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="acceptFriend(\''+req.from+'\')">����</button>';
-              html+='<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="rejectFriend(\''+req.from+'\')">�ܾ�</button></div></div>';
+              html+='<span>👤 '+escapeHtml(nm)+'</span>';
+              html+='<div><button class="btn btn-primary" style="font-size:12px;padding:4px 10px;margin-right:6px;" onclick="acceptFriend(\''+req.from+'\')">接受</button>';
+              html+='<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;" onclick="rejectFriend(\''+req.from+'\')">拒绝</button></div></div>';
             });
             list.innerHTML=html;
           } else { card.style.display='none'; }
@@ -556,7 +1077,7 @@ PAGES.messages = (app) => {
             if(card) card.style.display='';
             list.innerHTML=d.data.map(function(f){
               var nm=f.name||f.phone;
-              return '<div class="list-item" data-friend="'+escapeHtml(f.phone)+'"><div class="avatar">??</div><div class="list-content"><div class="list-name">'+escapeHtml(nm)+'</div><div class="list-desc">'+escapeHtml(f.lastMessage||'������Ϣ')+'</div></div></div>';
+              return '<div class="list-item" data-friend="'+escapeHtml(f.phone)+'"><div class="avatar">👤</div><div class="list-content"><div class="list-name">'+escapeHtml(nm)+'</div><div class="list-desc">'+escapeHtml(f.lastMessage||'暂无消息')+'</div></div></div>';
             }).join('');
             list.querySelectorAll('.list-item').forEach(function(el){
               el.onclick=function(){ var nm=this.querySelector('.list-name').textContent; navigate('chat',{name:nm,phone:this.dataset.friend}); };
@@ -568,10 +1089,10 @@ PAGES.messages = (app) => {
 };
 
 PAGES.chat = (app, params) => {
-    const name = params.name || '�Ի�';
+    const name = params.name || '对话';
     setNavTitle(name);
     
-    // �������
+    // 字体控制
     const fontSize = storage.getFontSize();
     setNavRight(`<div class="font-control"><button class="font-btn" id="font-minus">A-</button><span id="font-size-value" style="margin:0 4px;">${fontSize}px</span><button class="font-btn" id="font-plus">A+</button></div>`, null);
     const rightArea = document.getElementById('navbar-right');
@@ -600,11 +1121,11 @@ PAGES.chat = (app, params) => {
     let history = storage.getMessages(name);
     if (!history.length && DEFAULT_GREETINGS[name]) history = DEFAULT_GREETINGS[name].map((g,i) => ({ id: 'init_'+i, text: g.text, mine: g.mine, ts: Date.now() }));
     
-    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="��������Ϣ��" /><button class="voice-btn" id="voice-btn">??</button><button class="btn btn-secondary" id="send-btn">����</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">??</div><div class="voice-tip">�ɿ����� �� �ϻ�ȡ��</div></div></div>`;
+    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="请输入消息…" /><button class="voice-btn" id="voice-btn">🎤</button><button class="btn btn-secondary" id="send-btn">发送</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">🎙</div><div class="voice-tip">松开发送 · 上滑取消</div></div></div>`;
     const list = app.querySelector('#chat-list');
     const input = app.querySelector('#chat-input');
     const renderMsg = () => {
-        list.innerHTML = history.map(m => `<div class="msg ${m.mine ? 'me' : 'other'}"><div class="avatar">${m.mine ? '??' : '??'}</div><div class="bubble">${escapeHtml(m.text)}</div></div>`).join('');
+        list.innerHTML = history.map(m => `<div class="msg ${m.mine ? 'me' : 'other'}"><div class="avatar">${m.mine ? '👴' : '👤'}</div><div class="bubble">${escapeHtml(m.text)}</div></div>`).join('');
         list.scrollTop = list.scrollHeight;
     };
     renderMsg();
@@ -615,14 +1136,14 @@ PAGES.chat = (app, params) => {
         const my = { id: 'm_'+Date.now(), text, mine: true, ts: Date.now() };
         storage.addMessage(name, my);
         history.push(my);
-        const reply = { id: 'r_'+Date.now(), text: '�յ����һ������ע���Ľ�����', mine: false, ts: Date.now() };
+        const reply = { id: 'r_'+Date.now(), text: '收到，我会继续关注您的健康！', mine: false, ts: Date.now() };
         storage.addMessage(name, reply);
         history.push(reply);
         input.value = '';
         renderMsg();
     };
     
-    // ����¼��
+    // 语音录制
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
@@ -631,10 +1152,10 @@ PAGES.chat = (app, params) => {
         const y = e.clientY || e.touches?.[0]?.clientY;
         if (startY - y > 30) {
             overlay.classList.add('cancel');
-            overlayTip.textContent = '����ȡ��';
+            overlayTip.textContent = '松手取消';
         } else {
             overlay.classList.remove('cancel');
-            overlayTip.textContent = '�ɿ����� �� �ϻ�ȡ��';
+            overlayTip.textContent = '松开发送 · 上滑取消';
         }
     };
     voiceBtn.addEventListener('mousedown', startRecord);
@@ -653,7 +1174,7 @@ PAGES.chat = (app, params) => {
             document.addEventListener('mousemove', moveHandler);
             document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
-        }).catch(err => toast('�޷�¼����������˷�Ȩ��'));
+        }).catch(err => toast('无法录音，请检查麦克风权限'));
     }
     function stopRecord(e) {
         if (!mediaRecorder) return;
@@ -670,16 +1191,16 @@ PAGES.chat = (app, params) => {
             });
             const data = await res.json();
             if (data.url) {
-                toast('�������ϴ��������ݲ�֧���������ţ���תΪ��������');
-                const text = `[������Ϣ] ${data.url}`;
+                toast('语音已上传，单聊暂不支持语音播放，已转为文字链接');
+                const text = `[语音消息] ${data.url}`;
                 const my = { id: 'm_'+Date.now(), text, mine: true, ts: Date.now() };
                 storage.addMessage(name, my);
                 history.push(my);
-                const reply = { id: 'r_'+Date.now(), text: '���յ���������', mine: false, ts: Date.now() };
+                const reply = { id: 'r_'+Date.now(), text: '已收到您的语音', mine: false, ts: Date.now() };
                 storage.addMessage(name, reply);
                 history.push(reply);
                 renderMsg();
-            } else toast('�����ϴ�ʧ��');
+            } else toast('语音上传失败');
         };
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
@@ -699,39 +1220,39 @@ PAGES.chat = (app, params) => {
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
-            toast('��ȡ��¼��');
+            toast('已取消录音');
         }
     }
 };
 
-// Ⱥ���б�
+// 群聊列表
 PAGES['group-list'] = async (app) => {
-    setNavTitle('�ҵ�Ⱥ��');
+    setNavTitle('我的群聊');
     setNavRight('', null);
-    app.innerHTML = `<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">Ⱥ��</div><div class="header-subtitle"></div></div><div class="header-add" id="create-group">��</div></div><div id="groups-list" class="card"></div></div>`;
+    app.innerHTML = `<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">群聊</div><div class="header-subtitle"></div></div><div class="header-add" id="create-group">＋</div></div><div id="groups-list" class="card"></div></div>`;
     const groupsContainer = app.querySelector('#groups-list');
     app.querySelector('#create-group').onclick = () => navigate('group-create');
     try {
         const res = await fetch(`${API_BASE}/api/groups`, { headers: { 'Authorization': `Bearer ${currentUser.token}` } });
         if (res.ok) {
             const groups = await res.json();
-            if (groups.length === 0) groupsContainer.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">����Ⱥ�ģ����������</div>';
-            else groupsContainer.innerHTML = groups.map(g => `<div class="list-item" data-id="${g._id}"><div class="avatar">${g.avatar || '??'}</div><div class="list-content"><div class="list-name">${escapeHtml(g.name)}</div><div class="list-desc">${escapeHtml(g.lastMessage || '������Ϣ')}</div></div><div class="list-time">${new Date(g.lastTime).toLocaleTimeString()}</div></div>`).join('');
+            if (groups.length === 0) groupsContainer.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">暂无群聊，点击＋创建</div>';
+            else groupsContainer.innerHTML = groups.map(g => `<div class="list-item" data-id="${g._id}"><div class="avatar">${g.avatar || '👥'}</div><div class="list-content"><div class="list-name">${escapeHtml(g.name)}</div><div class="list-desc">${escapeHtml(g.lastMessage || '暂无消息')}</div></div><div class="list-time">${new Date(g.lastTime).toLocaleTimeString()}</div></div>`).join('');
             app.querySelectorAll('.list-item').forEach(el => el.onclick = () => navigate('group-chat', { groupId: el.dataset.id }));
-        } else toast('����Ⱥ��ʧ��');
-    } catch(e) { toast('��������޷�����Ⱥ��'); }
+        } else toast('加载群聊失败');
+    } catch(e) { toast('网络错误，无法加载群聊'); }
 };
 
-// ����Ⱥ��
+// 创建群聊
 PAGES['group-create'] = async (app) => {
-    setNavTitle('����Ⱥ��');
+    setNavTitle('创建群聊');
     const contacts = storage.getContacts();
-    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">Ⱥ����</div><input id="group-name" class="form-input" placeholder="����Ⱥ����" /></div><div class="card"><div class="card-title">ѡ���Ա</div><div class="checkbox-group" id="members-list"></div></div><button class="btn btn-primary btn-block" id="submit-create">����Ⱥ��</button></div>`;
+    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">群名称</div><input id="group-name" class="form-input" placeholder="输入群名称" /></div><div class="card"><div class="card-title">选择成员</div><div class="checkbox-group" id="members-list"></div></div><button class="btn btn-primary btn-block" id="submit-create">创建群聊</button></div>`;
     const membersDiv = app.querySelector('#members-list');
     membersDiv.innerHTML = contacts.map(c => `<div class="checkbox-item"><input type="checkbox" value="${escapeHtml(c.name)}" id="chk_${escapeHtml(c.name)}"><label for="chk_${escapeHtml(c.name)}">${c.avatar} ${c.name}</label></div>`).join('');
     app.querySelector('#submit-create').onclick = async () => {
         const name = app.querySelector('#group-name').value.trim();
-        if (!name) { toast('����дȺ����'); return; }
+        if (!name) { toast('请填写群名称'); return; }
         const selectedNames = Array.from(membersDiv.querySelectorAll('input:checked')).map(cb => cb.value);
         const contactsList = storage.getContacts();
         const memberPhones = selectedNames.map(sel => {
@@ -745,20 +1266,20 @@ PAGES['group-create'] = async (app) => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
                 body: JSON.stringify({ name, members: memberPhones })
             });
-            if (res.ok) { toast('�����ɹ�'); navigate('group-list'); }
-            else toast('����ʧ��');
+            if (res.ok) { toast('创建成功'); navigate('group-list'); }
+            else toast('创建失败');
         } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
     };
 };
 
-// Ⱥ��������
+// 群聊聊天室
 PAGES['group-chat'] = async (app, params) => {
     const groupId = params.groupId;
     if (!groupId) { navigate('group-list'); return; }
-    setNavTitle('Ⱥ��');
-    // ��ȡȺ����
-    let groupName = 'Ⱥ��';
+    setNavTitle('群聊');
+    // 获取群名称
+    let groupName = '群聊';
     try {
         const resGroups = await fetch(`${API_BASE}/api/groups`, { headers: { 'Authorization': `Bearer ${currentUser.token}` } });
         if (resGroups.ok) {
@@ -794,7 +1315,7 @@ PAGES['group-chat'] = async (app, params) => {
         });
     }
 
-    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="��������Ϣ��" /><button class="voice-btn" id="voice-btn">??</button><button class="btn btn-secondary" id="send-btn">����</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">??</div><div class="voice-tip">�ɿ����� �� �ϻ�ȡ��</div></div></div>`;
+    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="请输入消息…" /><button class="voice-btn" id="voice-btn">🎤</button><button class="btn btn-secondary" id="send-btn">发送</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">🎙</div><div class="voice-tip">松开发送 · 上滑取消</div></div></div>`;
     const list = app.querySelector('#chat-list');
     const input = app.querySelector('#chat-input');
     let messages = [];
@@ -805,15 +1326,15 @@ PAGES['group-chat'] = async (app, params) => {
                 messages = await res.json();
                 renderMsgs();
             }
-        } catch(e) { toast('������Ϣʧ��'); }
+        } catch(e) { toast('加载消息失败'); }
     }
     function renderMsgs() {
         list.innerHTML = messages.map(m => {
             const isMe = m.from === currentUser.phone;
             let content = '';
             if (m.text) content = escapeHtml(m.text);
-            else if (m.voiceUrl) content = `<div class="voice-message" data-url="${escapeHtml(m.voiceUrl)}"><span class="voice-icon">??</span><span class="voice-duration">������Ϣ</span></div>`;
-            return `<div class="msg ${isMe ? 'me' : 'other'}"><div class="avatar">${isMe ? '??' : '??'}</div><div class="bubble">${content}</div></div>`;
+            else if (m.voiceUrl) content = `<div class="voice-message" data-url="${escapeHtml(m.voiceUrl)}"><span class="voice-icon">🔊</span><span class="voice-duration">语音消息</span></div>`;
+            return `<div class="msg ${isMe ? 'me' : 'other'}"><div class="avatar">${isMe ? '👴' : '👤'}</div><div class="bubble">${content}</div></div>`;
         }).join('');
         list.scrollTop = list.scrollHeight;
         list.querySelectorAll('.voice-message').forEach(el => el.onclick = () => {
@@ -835,12 +1356,12 @@ PAGES['group-chat'] = async (app, params) => {
             if (res.ok) {
                 input.value = '';
                 await loadMessages();
-            } else toast('����ʧ��');
+            } else toast('发送失败');
         } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
     };
     
-    // ����¼��
+    // 语音录制
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
@@ -849,10 +1370,10 @@ PAGES['group-chat'] = async (app, params) => {
         const y = e.clientY || e.touches?.[0]?.clientY;
         if (startY - y > 30) {
             overlay.classList.add('cancel');
-            overlayTip.textContent = '����ȡ��';
+            overlayTip.textContent = '松手取消';
         } else {
             overlay.classList.remove('cancel');
-            overlayTip.textContent = '�ɿ����� �� �ϻ�ȡ��';
+            overlayTip.textContent = '松开发送 · 上滑取消';
         }
     };
     voiceBtn.addEventListener('mousedown', startRecord);
@@ -871,7 +1392,7 @@ PAGES['group-chat'] = async (app, params) => {
             document.addEventListener('mousemove', moveHandler);
             document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
-        }).catch(err => toast('�޷�¼��'));
+        }).catch(err => toast('无法录音'));
     }
     async function stopRecord(e) {
         if (!mediaRecorder) return;
@@ -895,10 +1416,10 @@ PAGES['group-chat'] = async (app, params) => {
                         body: JSON.stringify({ groupId, voiceUrl: data.url })
                     });
                     if (msgRes.ok) await loadMessages();
-                    else toast('��������ʧ��');
-                } else toast('�ϴ�ʧ��');
+                    else toast('语音发送失败');
+                } else toast('上传失败');
             } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
         };
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(t => t.stop());
@@ -918,14 +1439,14 @@ PAGES['group-chat'] = async (app, params) => {
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
-            toast('��ȡ��¼��');
+            toast('已取消录音');
         }
     }
 };
 
-// ��ȫ���֣��޸��棺���Զ���ת��¼��
+// 安全助手（修复版：不自动跳转登录）
 PAGES.assistant = (app) => {
-    setNavTitle('��ȫ����');
+    setNavTitle('安全助手');
     const fontSize = storage.getFontSize();
     setNavRight(`<div class="font-control"><button class="font-btn" id="font-minus">A-</button><span id="font-size-value" style="margin:0 4px;">${fontSize}px</span><button class="font-btn" id="font-plus">A+</button></div>`, null);
     const rightArea = document.getElementById('navbar-right');
@@ -951,14 +1472,14 @@ PAGES.assistant = (app) => {
         });
     }
 
-    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"><div class="msg other"><div class="avatar">??</div><div class="bubble">���ã��������İ�ȫ�������֣�������ʲô���԰�������</div></div></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="���뽡�����⡭" /><button class="voice-btn" id="voice-btn">??</button><button class="btn btn-secondary" id="send-btn">����</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">??</div><div class="voice-tip">�ɿ����� �� �ϻ�ȡ��</div></div></div>`;
+    app.innerHTML = `<div class="chat-page"><div class="chat-list" id="chat-list"><div class="msg other"><div class="avatar">🤖</div><div class="bubble">您好，我是您的安全健康助手，请问有什么可以帮助您？</div></div></div><div class="chat-input-bar"><input class="chat-input" id="chat-input" placeholder="输入健康问题…" /><button class="voice-btn" id="voice-btn">🎤</button><button class="btn btn-secondary" id="send-btn">发送</button></div><div class="voice-overlay" id="voice-overlay"><div class="voice-wave">🎙</div><div class="voice-tip">松开发送 · 上滑取消</div></div></div>`;
     const list = app.querySelector('#chat-list');
     const input = app.querySelector('#chat-input');
-    let history = [{ role: 'assistant', content: '���ã��������İ�ȫ�������֣�������ʲô���԰�������' }];
+    let history = [{ role: 'assistant', content: '您好，我是您的安全健康助手，请问有什么可以帮助您？' }];
     function addMessage(role, content) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `msg ${role === 'user' ? 'me' : 'other'}`;
-        msgDiv.innerHTML = `<div class="avatar">${role === 'user' ? '??' : '??'}</div><div class="bubble">${escapeHtml(content)}</div>`;
+        msgDiv.innerHTML = `<div class="avatar">${role === 'user' ? '👴' : '🤖'}</div><div class="bubble">${escapeHtml(content)}</div>`;
         list.appendChild(msgDiv);
         list.scrollTop = list.scrollHeight;
         history.push({ role, content });
@@ -978,13 +1499,13 @@ PAGES.assistant = (app) => {
                 const data = await res.json();
                 addMessage('assistant', data.reply);
             } else {
-                addMessage('assistant', '��Ǹ��������ʱ�����ã����Ժ����ԡ�');
+                addMessage('assistant', '抱歉，服务暂时不可用，请稍后再试。');
             }
         } catch(e) {
-            addMessage('assistant', '������������������ӡ�');
+            addMessage('assistant', '网络错误，请检查网络连接。');
         }
     };
-    // ����¼�ƣ�����ʾ��ʵ��δ������ʶ��
+    // 语音录制（仅演示，实际未做语音识别）
     let mediaRecorder = null, audioChunks = [], startY = 0;
     const voiceBtn = app.querySelector('#voice-btn');
     const overlay = app.querySelector('#voice-overlay');
@@ -993,10 +1514,10 @@ PAGES.assistant = (app) => {
         const y = e.clientY || e.touches?.[0]?.clientY;
         if (startY - y > 30) {
             overlay.classList.add('cancel');
-            overlayTip.textContent = '����ȡ��';
+            overlayTip.textContent = '松手取消';
         } else {
             overlay.classList.remove('cancel');
-            overlayTip.textContent = '�ɿ����� �� �ϻ�ȡ��';
+            overlayTip.textContent = '松开发送 · 上滑取消';
         }
     };
     voiceBtn.addEventListener('mousedown', startRecord);
@@ -1015,14 +1536,14 @@ PAGES.assistant = (app) => {
             document.addEventListener('mousemove', moveHandler);
             document.addEventListener('touchmove', moveHandler, { passive: false });
             voiceBtn.classList.add('recording');
-        }).catch(err => toast('�޷�¼��'));
+        }).catch(err => toast('无法录音'));
     }
     async function stopRecord(e) {
         if (!mediaRecorder) return;
         const endY = e.clientY || e.changedTouches?.[0]?.clientY;
         if (startY - endY > 50) { cancelRecord(); return; }
         mediaRecorder.onstop = () => {
-            toast('����ʶ����δ���ţ����ֶ���������');
+            toast('语音识别暂未开放，请手动输入文字');
             cancelRecord();
         };
         mediaRecorder.stop();
@@ -1043,38 +1564,38 @@ PAGES.assistant = (app) => {
             overlay.classList.remove('show');
             voiceBtn.classList.remove('recording');
             mediaRecorder = null;
-            toast('��ȡ��');
+            toast('已取消');
         }
     }
 };
 
-// ԭ������ҳ�棨prescription, courses, emergency, monitor, coin, report, profile-setup, me��
+// 原有其他页面（prescription, courses, emergency, monitor, coin, report, profile-setup, me）
 PAGES.prescription = (app) => {
-    setNavTitle('��������');
+    setNavTitle('处方管理');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">��������</div><div class="header-subtitle">���������˶�����</div></div></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">处方管理</div><div class="header-subtitle">管理患者运动处方</div></div></div>
             <div class="grid-2">
-                <div class="feature-tile orange" data-go="doctor-send-prescription"><div class="fi">??</div><div class="fn">�����˶�����</div></div>
-                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">??</div><div class="fn">�鿴��������</div></div>
+                <div class="feature-tile orange" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
+                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看患者数据</div></div>
             </div>
-            <div class="card"><div class="card-title">�ѷ��͵Ĵ���</div><div id="sent-prescriptions"><div class="text-muted" style="text-align:center;padding:12px;">�����ѷ��͵Ĵ�����¼</div></div></div>
+            <div class="card"><div class="card-title">已发送的处方</div><div id="sent-prescriptions"><div class="text-muted" style="text-align:center;padding:12px;">暂无已发送的处方记录</div></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
 };
 PAGES.courses = (app) => {
-    setNavTitle('�γ�ԤԼ');
-    let selected = '��������';
-    app.innerHTML = `<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">ƽ̨�����Ƽ�</div><div class="s">������������״��ƥ��</div></div></div>
-        <div class="card"><div class="course-card orange" data-name="��������"><div class="icon">??</div><div class="info"><div class="name">��������</div><div class="desc">12-16�˵�ǿ��Ȥζ��</div></div></div>
-        <div class="course-card" data-name="��ͨС���"><div class="icon">??</div><div class="info"><div class="name">��ͨС���</div><div class="desc">8-10���и�ǿ��ѵ��</div></div></div></div>
-        <button class="btn btn-primary btn-block" id="book-btn">����ԤԼ</button></div>`;
-    app.querySelectorAll('.course-card').forEach(el => el.onclick = () => { selected = el.dataset.name; toast(`��ѡ��${selected}`); });
-    app.querySelector('#book-btn').onclick = async () => { if ((await modal({ title: 'ԤԼȷ��', content: `�Ƿ�ԤԼ${selected}��` })).confirm) toast('ԤԼ�ɹ�'); };
+    setNavTitle('课程预约');
+    let selected = '大班体验课';
+    app.innerHTML = `<div class="container"><div class="banner orange"><div class="emoji">🎓</div><div><div class="t">平台智能推荐</div><div class="s">基于您的身体状况匹配</div></div></div>
+        <div class="card"><div class="course-card orange" data-name="大班体验课"><div class="icon">🏃</div><div class="info"><div class="name">大班体验课</div><div class="desc">12-16人低强度趣味课</div></div></div>
+        <div class="course-card" data-name="普通小班课"><div class="icon">👥</div><div class="info"><div class="name">普通小班课</div><div class="desc">8-10人中高强度训练</div></div></div></div>
+        <button class="btn btn-primary btn-block" id="book-btn">立即预约</button></div>`;
+    app.querySelectorAll('.course-card').forEach(el => el.onclick = () => { selected = el.dataset.name; toast(`已选择：${selected}`); });
+    app.querySelector('#book-btn').onclick = async () => { if ((await modal({ title: '预约确认', content: `是否预约${selected}？` })).confirm) toast('预约成功'); };
 };
 
 PAGES.emergency = (app) => {
-    setNavTitle('��������');
+    setNavTitle('紧急呼叫');
     (async function() {
     try {
         var res = await fetch(API_BASE + '/api/emergency/contacts', {
@@ -1083,26 +1604,26 @@ PAGES.emergency = (app) => {
         var data = await res.json();
         var contacts = data.contacts || [];
         var contactBtns = contacts.map(function(c) {
-            return '<button class="emergency-call-btn primary" data-tel="' + escapeHtml(c.phone) + '"><div class="avatar">??</div><div class="info"><div class="name">' + escapeHtml(c.name) + '</div><div class="desc">' + escapeHtml(c.phone) + '</div></div><div class="call-ic">??</div></button>';
+            return '<button class="emergency-call-btn primary" data-tel="' + escapeHtml(c.phone) + '"><div class="avatar">👤</div><div class="info"><div class="name">' + escapeHtml(c.name) + '</div><div class="desc">' + escapeHtml(c.phone) + '</div></div><div class="call-ic">📞</div></button>';
         }).join('');
-        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">�������������ֱ�Ӻ���</div><div class="s">����·���ť��������</div></div></div>' +
-        '<button class="emergency-call-btn danger" data-tel="120"><div class="avatar">??</div><div class="info"><div class="name">120 ����</div><div class="desc">�Զ�����λ��</div></div><div class="call-ic">??</div></button>' +
+        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">🆘</div><div><div class="t">遇到紧急情况？直接呼叫</div><div class="s">点击下方按钮立即拨打</div></div></div>' +
+        '<button class="emergency-call-btn danger" data-tel="120"><div class="avatar">🚑</div><div class="info"><div class="name">120 急救</div><div class="desc">自动共享位置</div></div><div class="call-ic">📞</div></button>' +
         contactBtns +
-        '<div class="card" style="margin-top:8px;"><div class="card-title">���ӽ�����ϵ��</div>' +
-        '<div class="form-row"><div class="form-label">��ע</div><input id="em-name" class="form-input" placeholder="��ϵ������" /></div>' +
-        '<div class="form-row"><div class="form-label">�ֻ���</div><input id="em-phone" class="form-input" placeholder="11λ�ֻ���" /></div>' +
-        '<button class="btn btn-primary btn-block" id="em-add-btn">���Ӳ�����</button></div>' +
-        '<button class="btn btn-ghost btn-block" id="manage-ec-btn" style="margin-top:8px;">?? ����������ϵ��</button></div>';
-    app.querySelectorAll('.emergency-call-btn').forEach(el => el.onclick = async () => { if ((await modal({ title: 'ȷ�Ϻ���', content: '���� ' + el.querySelector('.name').innerText, confirmColor: '#e8504a' })).confirm) location.href = 'tel:' + el.dataset.tel; });
+        '<div class="card" style="margin-top:8px;"><div class="card-title">添加紧急联系人</div>' +
+        '<div class="form-row"><div class="form-label">备注</div><input id="em-name" class="form-input" placeholder="联系人姓名" /></div>' +
+        '<div class="form-row"><div class="form-label">手机号</div><input id="em-phone" class="form-input" placeholder="11位手机号" /></div>' +
+        '<button class="btn btn-primary btn-block" id="em-add-btn">添加并保存</button></div>' +
+        '<button class="btn btn-ghost btn-block" id="manage-ec-btn" style="margin-top:8px;">📋 管理紧急联系人</button></div>';
+    app.querySelectorAll('.emergency-call-btn').forEach(el => el.onclick = async () => { if ((await modal({ title: '确认呼叫', content: '拨打 ' + el.querySelector('.name').innerText, confirmColor: '#e8504a' })).confirm) location.href = 'tel:' + el.dataset.tel; });
     var manageBtn = document.getElementById('manage-ec-btn');
     if(manageBtn) manageBtn.onclick = function() { navigate('emergency-contacts'); };
     var emAddBtnOk = document.getElementById('em-add-btn');
     if(emAddBtnOk) emAddBtnOk.onclick = async function() {
       var n = document.getElementById('em-name').value.trim();
       var p = document.getElementById('em-phone').value.trim();
-      if (!n || !p) { toast('����д������Ϣ'); return; }
-      if (!/^1[0-9]{10}$/.test(p)) { toast('��������ȷ���ֻ���'); return; }
-      if (!currentUser) { toast('���ȵ�¼'); return; }
+      if (!n || !p) { toast('请填写完整信息'); return; }
+      if (!/^1[0-9]{10}$/.test(p)) { toast('请输入正确的手机号'); return; }
+      if (!currentUser) { toast('请先登录'); return; }
       try {
         var r = await fetch(API_BASE + '/api/emergency/contacts', {
           method: 'POST',
@@ -1111,27 +1632,27 @@ PAGES.emergency = (app) => {
         });
         var d = await r.json();
         if (d.ok) {
-          toast('�ѱ��沢��ֱ�Ӳ��� ' + n);
+          toast('已保存并可直接拨打 ' + n);
           navigate('emergency');
-        } else toast(d.error || '����ʧ��');
-      } catch(e) { toast('�������'); }
+        } else toast(d.error || '添加失败');
+      } catch(e) { toast('网络错误'); }
     };
     } catch(e) {
-        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">�������������ֱ�Ӻ���</div><div class="s">����·���ť��������</div></div></div>' +
-        '<button class="emergency-call-btn danger" data-tel="120"><div class="avatar">??</div><div class="info"><div class="name">120 ����</div><div class="desc">�Զ�����λ��</div></div><div class="call-ic">??</div></button>' +
-        '<button class="btn btn-ghost btn-block" id="manage-ec-btn-fb" style="margin-top:8px;">?? ����������ϵ��</button></div>';
+        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">🆘</div><div><div class="t">遇到紧急情况？直接呼叫</div><div class="s">点击下方按钮立即拨打</div></div></div>' +
+        '<button class="emergency-call-btn danger" data-tel="120"><div class="avatar">🚑</div><div class="info"><div class="name">120 急救</div><div class="desc">自动共享位置</div></div><div class="call-ic">📞</div></button>' +
+        '<button class="btn btn-ghost btn-block" id="manage-ec-btn-fb" style="margin-top:8px;">📋 管理紧急联系人</button></div>';
         // Also add the emergency add form in catch
         // Already done in the app.innerHTML above
-        app.querySelectorAll('.emergency-call-btn').forEach(el => el.onclick = async () => { if ((await modal({ title: 'ȷ�Ϻ���', content: '���� ' + el.querySelector('.name').innerText, confirmColor: '#e8504a' })).confirm) location.href = 'tel:' + el.dataset.tel; });
+        app.querySelectorAll('.emergency-call-btn').forEach(el => el.onclick = async () => { if ((await modal({ title: '确认呼叫', content: '拨打 ' + el.querySelector('.name').innerText, confirmColor: '#e8504a' })).confirm) location.href = 'tel:' + el.dataset.tel; });
         var fbBtn = document.getElementById('manage-ec-btn-fb');
         if(fbBtn) fbBtn.onclick = function() { navigate('emergency-contacts'); };
     var emAddBtn = document.getElementById('em-add-btn');
     if(emAddBtn) emAddBtn.onclick = async function() {
       var n = document.getElementById('em-name').value.trim();
       var p = document.getElementById('em-phone').value.trim();
-      if (!n || !p) { toast('����д������Ϣ'); return; }
-      if (!/^1[0-9]{10}$/.test(p)) { toast('��������ȷ���ֻ���'); return; }
-      if (!currentUser) { toast('���ȵ�¼'); return; }
+      if (!n || !p) { toast('请填写完整信息'); return; }
+      if (!/^1[0-9]{10}$/.test(p)) { toast('请输入正确的手机号'); return; }
+      if (!currentUser) { toast('请先登录'); return; }
       try {
         var r = await fetch(API_BASE + '/api/emergency/contacts', {
           method: 'POST',
@@ -1140,17 +1661,17 @@ PAGES.emergency = (app) => {
         });
         var d = await r.json();
         if (d.ok) {
-          toast('�ѱ��沢��ֱ�Ӳ��� ' + n);
+          toast('已保存并可直接拨打 ' + n);
           navigate('emergency');
-        } else toast(d.error || '����ʧ��');
-      } catch(e) { toast('�������'); }
+        } else toast(d.error || '添加失败');
+      } catch(e) { toast('网络错误'); }
     };
     }
     })();
 };
 
 PAGES['emergency-contacts'] = (app) => {
-    setNavTitle('����������ϵ��');
+    setNavTitle('管理紧急联系人');
     loadEmergencyContactsPage(app);
 };
 
@@ -1161,23 +1682,23 @@ async function loadEmergencyContactsPage(app) {
         });
         var data = await res.json();
         var contacts = data.contacts || [];
-        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">������ϵ��</div><div class="s">���������ε���ϵ�ˣ�����ʱһ������</div></div></div>' +
-            '<div class="card"><div class="card-title">�ҵĽ�����ϵ��</div><div id="ec-contacts-list">' +
-            (contacts.length === 0 ? '<div class="text-muted" style="text-align:center;padding:15px;">���޽�����ϵ��</div>' :
+        app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">📞</div><div><div class="t">紧急联系人</div><div class="s">添加您信任的联系人，紧急时一键呼叫</div></div></div>' +
+            '<div class="card"><div class="card-title">我的紧急联系人</div><div id="ec-contacts-list">' +
+            (contacts.length === 0 ? '<div class="text-muted" style="text-align:center;padding:15px;">暂无紧急联系人</div>' :
             contacts.map(function(c) {
-                return '<div class="form-row" style="border-bottom:1px solid #f0f0f0;padding:8px 0;"><div class="avatar">??</div><div style="flex:1;"><div style="font-weight:600;">' + escapeHtml(c.name) + '</div><div style="font-size:13px;color:var(--gray);">' + escapeHtml(c.phone) + '</div></div><button class="btn btn-danger ec-del-btn" data-phone="' + escapeHtml(c.phone) + '" style="padding:4px 8px;font-size:12px;">ɾ��</button></div>';
+                return '<div class="form-row" style="border-bottom:1px solid #f0f0f0;padding:8px 0;"><div class="avatar">👤</div><div style="flex:1;"><div style="font-weight:600;">' + escapeHtml(c.name) + '</div><div style="font-size:13px;color:var(--gray);">' + escapeHtml(c.phone) + '</div></div><button class="btn btn-danger ec-del-btn" data-phone="' + escapeHtml(c.phone) + '" style="padding:4px 8px;font-size:12px;">删除</button></div>';
             }).join('')) +
             '</div></div>' +
-            '<div class="card"><div class="card-title">���ӽ�����ϵ��</div>' +
-            '<div class="form-row"><div class="form-label">����</div><input id="ec-name" class="form-input" placeholder="��ϵ������" /></div>' +
-            '<div class="form-row"><div class="form-label">�ֻ���</div><input id="ec-phone" class="form-input" placeholder="11λ�ֻ���" /></div>' +
-            '<button class="btn btn-primary btn-block" id="add-ec-btn">����</button></div></div>';
+            '<div class="card"><div class="card-title">添加紧急联系人</div>' +
+            '<div class="form-row"><div class="form-label">姓名</div><input id="ec-name" class="form-input" placeholder="联系人姓名" /></div>' +
+            '<div class="form-row"><div class="form-label">手机号</div><input id="ec-phone" class="form-input" placeholder="11位手机号" /></div>' +
+            '<button class="btn btn-primary btn-block" id="add-ec-btn">添加</button></div></div>';
         
         app.querySelectorAll('.ec-del-btn').forEach(function(el) {
             el.onclick = async function() {
                 var phone = el.dataset.phone;
                 if (!phone) return;
-                var r2 = await modal({ title: 'ȷ��ɾ��', content: 'ȷ��Ҫɾ���ý�����ϵ����', confirmColor: '#e8504a' });
+                var r2 = await modal({ title: '确认删除', content: '确定要删除该紧急联系人吗？', confirmColor: '#e8504a' });
                 if (r2.confirm) {
                     try {
                         var r3 = await fetch(API_BASE + '/api/emergency/contacts/delete', {
@@ -1186,10 +1707,10 @@ async function loadEmergencyContactsPage(app) {
                             body: JSON.stringify({ phone: phone })
                         });
                         var d2 = await r3.json();
-                        if (d2.ok) { toast('��ɾ��'); loadEmergencyContactsPage(app); }
-                        else toast(d2.error || 'ɾ��ʧ��');
+                        if (d2.ok) { toast('已删除'); loadEmergencyContactsPage(app); }
+                        else toast(d2.error || '删除失败');
                     } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
                 }
             };
         });
@@ -1197,8 +1718,8 @@ async function loadEmergencyContactsPage(app) {
         document.getElementById('add-ec-btn').onclick = async function() {
             var name = document.getElementById('ec-name').value.trim();
             var phone = document.getElementById('ec-phone').value.trim();
-            if (!name || !phone) { toast('����д������Ϣ'); return; }
-            if (!/^1[0-9]{10}$/.test(phone)) { toast('��������ȷ���ֻ���'); return; }
+            if (!name || !phone) { toast('请填写完整信息'); return; }
+            if (!/^1[0-9]{10}$/.test(phone)) { toast('请输入正确的手机号'); return; }
             try {
                 var r4 = await fetch(API_BASE + '/api/emergency/contacts', {
                     method: 'POST',
@@ -1206,39 +1727,39 @@ async function loadEmergencyContactsPage(app) {
                     body: JSON.stringify({ name: name, phone: phone })
                 });
                 var d4 = await r4.json();
-                if (d4.ok) { toast('���ӳɹ�'); loadEmergencyContactsPage(app); }
-                else toast(d4.error || '����ʧ��');
+                if (d4.ok) { toast('添加成功'); loadEmergencyContactsPage(app); }
+                else toast(d4.error || '添加失败');
             } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
         };
     } catch(e) {
-        app.innerHTML = '<div class="container"><div class="card"><div class="text-muted" style="text-align:center;padding:20px;">����ʧ�ܣ���������</div><button class="btn btn-primary btn-block" id="back-to-em">����</button></div></div>';
+        app.innerHTML = '<div class="container"><div class="card"><div class="text-muted" style="text-align:center;padding:20px;">加载失败，请检查网络</div><button class="btn btn-primary btn-block" id="back-to-em">返回</button></div></div>';
         document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������');
+        toast('网络错误');
     }
 }
 
 PAGES.monitor = (app) => {
-    setNavTitle('�������');
+    setNavTitle('健康监测');
     const h = storage.getHealthData();
-    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">Ѫѹ���</div><div class="fs-40 fw-600 text-green">${h.bloodPressure}</div></div><div class="card"><div class="card-title">���ʼ��</div><div class="fs-40 fw-600 text-orange">${h.heartRate} ��/��</div></div><div class="card"><div class="card-title">Ѫ�����Ͷ�</div><div class="fs-40 fw-600 text-green">${h.bloodOxygen}%</div></div></div>`;
+    app.innerHTML = `<div class="container"><div class="card"><div class="card-title">血压监测</div><div class="fs-40 fw-600 text-green">${h.bloodPressure}</div></div><div class="card"><div class="card-title">心率监测</div><div class="fs-40 fw-600 text-orange">${h.heartRate} 次/分</div></div><div class="card"><div class="card-title">血氧饱和度</div><div class="fs-40 fw-600 text-green">${h.bloodOxygen}%</div></div></div>`;
 };
 PAGES.coin = (app) => {
-    setNavTitle("������");
-    app.innerHTML = '<div class="container"><div class="coin-hero" id="coin-hero"><div class="coin-logo">��</div><div class="coin-num" id="coin-num">0</div><div class="coin-label">�ҵĽ�����</div></div><div class="card"><div class="card-title">��ȡ��¼</div><div class="form-row"><span class="coin-tag get">+1</span><div>�����˶���</div></div></div>'+
-      '<div class="card"><div class="card-title">��ֵ������</div>'+
+    setNavTitle("健康币");
+    app.innerHTML = '<div class="container"><div class="coin-hero" id="coin-hero"><div class="coin-logo">币</div><div class="coin-num" id="coin-num">0</div><div class="coin-label">我的健康币</div></div><div class="card"><div class="card-title">获取记录</div><div class="form-row"><span class="coin-tag get">+1</span><div>今日运动打卡</div></div></div>'+
+      '<div class="card"><div class="card-title">充值健康币</div>'+
       '<div class="grid-2" style="margin-bottom:8px;">'+
-      '<div class="feature-tile orange" onclick="selectRecharge(10)"><div class="fi">10</div><div class="fn">10 ö</div></div>'+
-      '<div class="feature-tile green" onclick="selectRecharge(30)"><div class="fi">30</div><div class="fn">30 ö</div></div>'+
-      '<div class="feature-tile orange" onclick="selectRecharge(50)"><div class="fi">50</div><div class="fn">50 ö</div></div>'+
-      '<div class="feature-tile green" onclick="selectRecharge(100)"><div class="fi">100</div><div class="fn">100 ö</div></div>'+
+      '<div class="feature-tile orange" onclick="selectRecharge(10)"><div class="fi">10</div><div class="fn">10 枚</div></div>'+
+      '<div class="feature-tile green" onclick="selectRecharge(30)"><div class="fi">30</div><div class="fn">30 枚</div></div>'+
+      '<div class="feature-tile orange" onclick="selectRecharge(50)"><div class="fi">50</div><div class="fn">50 枚</div></div>'+
+      '<div class="feature-tile green" onclick="selectRecharge(100)"><div class="fi">100</div><div class="fn">100 枚</div></div>'+
       '</div>'+
-      '<div style="text-align:center;font-size:16px;margin-bottom:12px;">ѡ����: <strong id="selected-amount">50</strong> ö</div>'+
-      '<div style="display:flex;gap:8px;margin-bottom:8px;"><button class="btn btn-secondary" style="flex:1;font-size:16px;" onclick=\'doRecharge("΢��")\'>\uD83D\uDCB1 ΢��֧��</button><button class="btn btn-primary" style="flex:1;font-size:16px;" onclick=\'doRecharge("֧����")\'>\uD83D\uDCB0 ֧����</button></div>'+
+      '<div style="text-align:center;font-size:16px;margin-bottom:12px;">选择金额: <strong id="selected-amount">50</strong> 枚</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:8px;"><button class="btn btn-secondary" style="flex:1;font-size:16px;" onclick=\'doRecharge("微信")\'>\uD83D\uDCB1 微信支付</button><button class="btn btn-primary" style="flex:1;font-size:16px;" onclick=\'doRecharge("支付宝")\'>\uD83D\uDCB0 支付宝</button></div>'+
       '<div id="recharge-result" style="text-align:center;font-size:14px;"></div></div>'+
-'<div style="text-align:center;font-size:12px;color:#999;padding:8px 0;">?? 1������ = 1Ԫ�������ڶһ��γ������</div>'+
+'<div style="text-align:center;font-size:12px;color:#999;padding:8px 0;">💡 1健康币 = 1元，可用于兑换课程与服务</div>'+
 
-      '<div class="card"><div class="card-title">���ѷ���</div><div id="svc-in-coin"><div class="text-muted" style="text-align:center;padding:10px;">��</div></div></div></div>';
+      '<div class="card"><div class="card-title">付费服务</div><div id="svc-in-coin"><div class="text-muted" style="text-align:center;padding:10px;">无</div></div></div></div>';
     // Load coins from server
     if(currentUser){
       fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
@@ -1250,46 +1771,46 @@ PAGES.coin = (app) => {
       window._rechargeAmount = amount;
     };
     window.doRecharge = async function(method) {
-      if(!currentUser){toast("���ȵ�¼");return;}
+      if(!currentUser){toast("请先登录");return;}
       var amount = window._rechargeAmount || 50;
-      document.getElementById("recharge-result").innerHTML = '<div class="chart-placeholder">\uD83D\uDD04 ���ڴ���'+method+'֧��...</div>';
+      document.getElementById("recharge-result").innerHTML = '<div class="chart-placeholder">\uD83D\uDD04 正在处理'+method+'支付...</div>';
       try {
         var res = await fetch(API_BASE+"/api/coins/recharge",{
           method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+currentUser.token},
           body:JSON.stringify({amount:amount,method:method})
         });
         var data = await res.json();
-        if(data.ok){toast(method+"��ֵ�ɹ� \u2705");}else{toast(data.error||"��ֵʧ��");}
+        if(data.ok){toast(method+"充值成功 \u2705");}else{toast(data.error||"充值失败");}
         // Refresh coin display
         var cr = await fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}});
         var cd = await cr.json();
         document.getElementById("coin-num").textContent = cd.coins||0;
-      } catch(e){toast("�������");}
+      } catch(e){toast("网络错误");}
     };
     window.selectRecharge(50);
     // Load services
     fetch(API_BASE+"/api/services").then(function(r){return r.json();}).then(function(d){
       if(d.data&&d.data.length){
         var html = d.data.map(function(s){
-          return '<div class="form-row" style="cursor:pointer;"><span>\uD83D\uDCB3</span><div style="flex:1"><strong>'+escapeHtml(s.name)+'</strong><br><span style="font-size:13px;color:var(--gray);">\u00a5 '+s.price+' | �Ѳ��� '+(s.enrolled||0)+'/'+s.maxParticipants+' ��</span></div><button class="btn btn-primary" style="font-size:13px;padding:6px 14px;" onclick=\'purchaseService("'+s.id+'")\'>����</button></div>';
+          return '<div class="form-row" style="cursor:pointer;"><span>\uD83D\uDCB3</span><div style="flex:1"><strong>'+escapeHtml(s.name)+'</strong><br><span style="font-size:13px;color:var(--gray);">\u00a5 '+s.price+' | 已参与 '+(s.enrolled||0)+'/'+s.maxParticipants+' 人</span></div><button class="btn btn-primary" style="font-size:13px;padding:6px 14px;" onclick=\'purchaseService("'+s.id+'")\'>购买</button></div>';
         }).join("");
         document.getElementById("svc-in-coin").innerHTML = html;
       } else {
-        document.getElementById("svc-in-coin").innerHTML = '<div class="text-muted" style="font-size:14px;text-align:center;padding:10px;">���޿��÷���</div>';
+        document.getElementById("svc-in-coin").innerHTML = '<div class="text-muted" style="font-size:14px;text-align:center;padding:10px;">暂无可用服务</div>';
       }
     });
   };
 PAGES['profile-setup'] = (app) => {
-    setNavTitle('¼������');
+    setNavTitle('录入资料');
     const p = storage.getProfile() || {};
     let form = { name: p.name || '', height: p.height || '165', weight: p.weight || '65', age: p.age || '65', hasChronic: !!p.hasChronic };
     var h = parseInt(form.height) || 165;
     var w = parseInt(form.weight) || 65;
     var a = parseInt(form.age) || 65;
-    app.innerHTML = '<div class="container"><div class="card"><div class="card-title">�������</div>' +
-        '<div class="form-row"><div class="form-label">����</div><input class="form-input" data-f="name" value="' + escapeHtml(form.name) + '" /></div>' +
+    app.innerHTML = '<div class="container"><div class="card"><div class="card-title">基本情况</div>' +
+        '<div class="form-row"><div class="form-label">姓名</div><input class="form-input" data-f="name" value="' + escapeHtml(form.name) + '" /></div>' +
         '<div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">' +
-          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">����</div>' +
+          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">身高</div>' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
             '<input type="range" class="form-input" data-f="height" min="120" max="220" value="' + h + '" style="flex:1;">' +
             '<span class="range-val" data-f="height">' + h + '</span>' +
@@ -1297,7 +1818,7 @@ PAGES['profile-setup'] = (app) => {
           '</div>' +
         '</div>' +
         '<div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">' +
-          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">����</div>' +
+          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">体重</div>' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
             '<input type="range" class="form-input" data-f="weight" min="30" max="150" value="' + w + '" style="flex:1;">' +
             '<span class="range-val" data-f="weight">' + w + '</span>' +
@@ -1305,15 +1826,15 @@ PAGES['profile-setup'] = (app) => {
           '</div>' +
         '</div>' +
         '<div style="margin-bottom:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;">' +
-          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">����</div>' +
+          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">年龄</div>' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
             '<input type="range" class="form-input" data-f="age" min="40" max="100" value="' + a + '" style="flex:1;">' +
             '<span class="range-val" data-f="age">' + a + '</span>' +
-            '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:45px;text-align:right;">��</span>' +
+            '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:45px;text-align:right;">岁</span>' +
           '</div>' +
         '</div></div>' +
-        '<div class="card"><div class="card-title">����״��</div><div class="check-row" id="chronic-row"><div class="check-box ' + (form.hasChronic ? 'checked' : '') + '">' + (form.hasChronic ? '?' : '') + '</div><span>�л����������Բ�ʷ</span></div></div>' +
-        '<button class="btn btn-primary btn-block" id="submit-btn">�ύ�������˶�����</button></div>';
+        '<div class="card"><div class="card-title">身体状况</div><div class="check-row" id="chronic-row"><div class="check-box ' + (form.hasChronic ? 'checked' : '') + '">' + (form.hasChronic ? '✓' : '') + '</div><span>有基础病或慢性病史</span></div></div>' +
+        '<button class="btn btn-primary btn-block" id="submit-btn">提交并生成运动方案</button></div>';
     app.querySelectorAll('[data-f]').forEach(function(el) { el.oninput = function() { form[el.dataset.f] = el.value; }; });
     app.querySelectorAll('input[type="range"]').forEach(function(el) {
       el.oninput = function() {
@@ -1326,108 +1847,108 @@ PAGES['profile-setup'] = (app) => {
         form.hasChronic = !form.hasChronic;
         var box = app.querySelector('#chronic-row .check-box');
         box.classList.toggle('checked', form.hasChronic);
-        box.textContent = form.hasChronic ? '?' : '';
+        box.textContent = form.hasChronic ? '✓' : '';
     };
-    app.querySelector('#submit-btn').onclick = function() { storage.setProfile(form); storage.setPrescription(storage.generatePrescription(form)); toast('�����ѱ���'); navigate('prescription'); };
+    app.querySelector('#submit-btn').onclick = function() { storage.setProfile(form); storage.setPrescription(storage.generatePrescription(form)); toast('资料已保存'); navigate('prescription'); };
 };
 
 PAGES['ai-chat'] = (app) => {
-    setNavTitle('�����㷨');
+    setNavTitle('智能算法');
     var adviceText = '';
     var showingForm = false;
     
     function renderMain() {
       showingForm = false;
-      app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">����Ӫ�����˶�����</div><div class="s">�����ṩ���Ľ������ݣ�ϵͳ�����ɸ��Ի�����</div></div></div>' +
-        '<div class="card"><div class="card-title">��������</div><div id="advice-content"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">����·���ť����д�������ݻ�ȡ����</div></div></div>' +
-        '<div class="card"><button class="btn btn-primary btn-block" id="provide-data-btn">?? �ṩ��������</button></div>' +
-        '<div class="card"><button class="btn btn-secondary btn-block" id="refresh-advice-btn">?? ˢ�½���</button></div></div>';
+      app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">🧠</div><div><div class="t">智能营养与运动建议</div><div class="s">请先提供您的健康数据，系统将生成个性化建议</div></div></div>' +
+        '<div class="card"><div class="card-title">健康建议</div><div id="advice-content"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">点击下方按钮，填写健康数据获取建议</div></div></div>' +
+        '<div class="card"><button class="btn btn-primary btn-block" id="provide-data-btn">📊 提供健康数据</button></div>' +
+        '<div class="card"><button class="btn btn-secondary btn-block" id="refresh-advice-btn">🔄 刷新建议</button></div></div>';
       app.querySelector('#provide-data-btn').onclick = renderForm;
       app.querySelector('#refresh-advice-btn').onclick = function() {
         if(adviceText) {
           var formatted = adviceText.replace(/\\n/g, '<br>');
           document.getElementById('advice-content').innerHTML = '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);color:var(--text);font-size:15px;line-height:1.8;">' + formatted + '</div>';
-          toast('��ˢ��');
+          toast('已刷新');
         } else {
-          toast('���޽��飬�����ṩ��������');
+          toast('暂无建议，请先提供健康数据');
         }
       };
     }
     
     function renderForm() {
-      if(!currentUser){toast('���ȵ�¼');return;}
+      if(!currentUser){toast('请先登录');return;}
       showingForm = true;
-      app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">??</div><div><div class="t">��д��������</div><div class="s">ͨ������������Ľ���ָ�꣬Ȼ���ȡ����</div></div></div>' +
-        '<div class="card"><div class="card-title">��ǰ����ָ��</div>' +
+      app.innerHTML = '<div class="container"><div class="banner orange"><div class="emoji">🧠</div><div><div class="t">填写健康数据</div><div class="s">通过滑块调整您的健康指标，然后获取建议</div></div></div>' +
+        '<div class="card"><div class="card-title">当前健康指标</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">����</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">年龄</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-age" min="40" max="100" value="65" style="flex:1;">' +
       '<span class="range-val" data-f="ai-age">65</span>' +
-      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">��</span>' +
+      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">岁</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">����</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">身高</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-height" min="120" max="220" value="165" style="flex:1;">' +
       '<span class="range-val" data-f="ai-height">165</span>' +
       '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">cm</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">����</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">体重</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-weight" min="30" max="150" value="65" style="flex:1;">' +
       '<span class="range-val" data-f="ai-weight">65</span>' +
       '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">kg</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">Ѫѹ(����ѹ)</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">血压(收缩压)</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-bloodPressure" min="80" max="220" value="120" style="flex:1;">' +
       '<span class="range-val" data-f="ai-bloodPressure">120</span>' +
       '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">mmHg</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">����</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">心率</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-heartRate" min="30" max="220" value="72" style="flex:1;">' +
       '<span class="range-val" data-f="ai-heartRate">72</span>' +
-      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">��/��</span>' +
+      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">次/分</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">Ѫ��</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">血氧</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-bloodOxygen" min="60" max="100" value="97" style="flex:1;">' +
       '<span class="range-val" data-f="ai-bloodOxygen">97</span>' +
       '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">%</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">Ѫ��</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">血糖</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-bloodSugar" min="20" max="200" value="55" style="flex:1;">' +
       '<span class="range-val" data-f="ai-bloodSugar">55</span>' +
       '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">mmol/L</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">����</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">步数</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-steps" min="0" max="50000" value="5000" style="flex:1;">' +
       '<span class="range-val" data-f="ai-steps">5000</span>' +
-      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">��</span>' +
+      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">步</span>' +
       '</div>' +
 '<div style="margin-bottom:10px;padding:6px 0;border-bottom:1px solid #f0f0f0;">' +
-      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">˯��ʱ��</div>' +
+      '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">睡眠时长</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<input type="range" class="form-input" data-f="ai-sleep" min="0" max="24" value="7" style="flex:1;">' +
       '<span class="range-val" data-f="ai-sleep">7</span>' +
-      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">Сʱ</span>' +
+      '<span style="font-size:11px;color:var(--gray);white-space:nowrap;width:55px;text-align:right;">小时</span>' +
       '</div>' +
         '</div>' +
-        '<div class="card"><div class="card-title">���Բ�ʷ</div>' +
-        '<div class="check-row" id="ai-chronic-row"><div class="check-box" id="ai-chronic-box"></div><span>�л����������Բ�ʷ</span></div></div' +
-        '<div class="card"><div class="card-title">��������</div><div id="advice-content" style="margin-top:8px;"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">��д���ݺ����·���ť��ȡ����</div></div></div>' +
-        '<button class="btn btn-primary btn-block" id="submit-advice-btn">?? ��ȡ����</button>' +
-        '<button class="btn btn-ghost btn-block" id="back-to-main-btn" style="margin-top:8px;">�� ����</button></div>';
+        '<div class="card"><div class="card-title">慢性病史</div>' +
+        '<div class="check-row" id="ai-chronic-row"><div class="check-box" id="ai-chronic-box"></div><span>有基础病或慢性病史</span></div></div' +
+        '<div class="card"><div class="card-title">健康建议</div><div id="advice-content" style="margin-top:8px;"><div class="text-muted" style="text-align:center;padding:20px;font-size:15px;">填写数据后点击下方按钮获取建议</div></div></div>' +
+        '<button class="btn btn-primary btn-block" id="submit-advice-btn">💡 获取建议</button>' +
+        '<button class="btn btn-ghost btn-block" id="back-to-main-btn" style="margin-top:8px;">← 返回</button></div>';
       
       // Slider value update
       app.querySelectorAll('input[type="range"]').forEach(function(el) {
@@ -1443,7 +1964,7 @@ PAGES['ai-chat'] = (app) => {
         hasChronic = !hasChronic;
         var box = document.getElementById('ai-chronic-box');
         box.classList.toggle('checked', hasChronic);
-        box.textContent = hasChronic ? '?' : '';
+        box.textContent = hasChronic ? '✓' : '';
       };
       
       // Back button
@@ -1459,9 +1980,9 @@ PAGES['ai-chat'] = (app) => {
             body[fieldName] = el.value;
           }
         });
-        body.chronicDiseases = hasChronic ? '�����Բ�ʷ' : '';
+        body.chronicDiseases = hasChronic ? '有慢性病史' : '';
         
-        document.getElementById('advice-content').innerHTML = '<div class="chart-placeholder">?? ���ڷ������Ľ�������...</div>';
+        document.getElementById('advice-content').innerHTML = '<div class="chart-placeholder">🤔 正在分析您的健康数据...</div>';
         
         try {
           var res = await fetch(API_BASE + '/api/nutrition-advice', {
@@ -1474,14 +1995,14 @@ PAGES['ai-chat'] = (app) => {
             renderMain();
             var formatted = result.advice.replace(/\\n/g, '<br>');
             document.getElementById('advice-content').innerHTML = '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);color:var(--text);font-size:15px;line-height:1.8;">' + formatted + '</div>';
-            toast('���������� ?');
+            toast('建议已生成 ✅');
           } else {
-            document.getElementById('advice-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">��ʱ�޷����ɽ��飬���Ժ�����</div>';
-            toast('����ʧ��');
+            document.getElementById('advice-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">暂时无法生成建议，请稍后再试</div>';
+            toast('生成失败');
           }
         } catch(e) {
-          document.getElementById('advice-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">�������������</div>';
-          toast('�������');
+          document.getElementById('advice-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">网络错误，请重试</div>';
+          toast('网络错误');
         }
       };
     }
@@ -1493,15 +2014,15 @@ PAGES.me = (app) => {
     const streak = storage.signStreak();
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">�ҵ�</div><div class="header-subtitle">��������</div></div></div>
-            <div class="card"><div class="row"><div class="avatar orange" style="width:65px;height:65px;font-size:35px;">\uD83D\uDC68</div><div><div class="fs-40 fw-600">${escapeHtml(p.name || '����')}${(currentUser&&currentUser.role?'<span class="tag orange">' + escapeHtml(currentUser.role) + '</span>':'')}${p.hasChronic ? '<span class="tag">���Բ�</span>' : ''}<span class="tag orange">VIP</span></div></div><button class="btn btn-ghost" data-go="profile-setup">�༭</button></div><div class="row mt-20"><div class="info-pill green"><div class="fs-36 fw-600">${p.height || '178'} cm</div><div>����</div></div><div class="info-pill orange"><div class="fs-36 fw-600">${p.weight || '66'} kg</div><div>����</div></div></div></div>
-            <div class="card"><div class="card-title">��������</div>
-                <div class="form-row" data-go="qualifications"><span>??</span><div style="flex:1">���ʹ���</div><span>?</span></div>
-                <div class="form-row" data-go="income"><span>??</span><div style="flex:1">�������</div><span>?</span></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">我的</div><div class="header-subtitle">个人中心</div></div></div>
+            <div class="card"><div class="row"><div class="avatar orange" style="width:65px;height:65px;font-size:35px;">\uD83D\uDC68</div><div><div class="fs-40 fw-600">${escapeHtml(p.name || '张三')}${(currentUser&&currentUser.role?'<span class="tag orange">' + escapeHtml(currentUser.role) + '</span>':'')}${p.hasChronic ? '<span class="tag">慢性病</span>' : ''}<span class="tag orange">VIP</span></div></div><button class="btn btn-ghost" data-go="profile-setup">编辑</button></div><div class="row mt-20"><div class="info-pill green"><div class="fs-36 fw-600">${p.height || '178'} cm</div><div>身高</div></div><div class="info-pill orange"><div class="fs-36 fw-600">${p.weight || '66'} kg</div><div>体重</div></div></div></div>
+            <div class="card"><div class="card-title">个人中心</div>
+                <div class="form-row" data-go="qualifications"><span>🎓</span><div style="flex:1">资质管理</div><span>›</span></div>
+                <div class="form-row" data-go="income"><span>💰</span><div style="flex:1">收入管理</div><span>›</span></div>
             </div>
-            <div class="card"><div class="card-title">�˺�</div><div class="form-row" data-go="profile-setup"><span>\uD83D\uDC68\u200D</span><div style="flex:1">��������</div><span>\u203A</span></div><div class="form-row" data-go="monitor"><span>\uD83D\uDCF3</span><div style="flex:1">�ҵ�����</div><span>\u203A</span></div><div class="form-row" data-go="coin"><span>\uD83E\uDE99</span><div style="flex:1">������</div><span>${storage.signStreak()+2} ö \u203A</span></div><div class="form-row" data-go="services"><span>\uD83D\uDCB3</span><div style="flex:1">���ѷ���</div><span>\u203A</span></div><div class="form-row" data-go="myrx"><span>\uD83D\uDCCB</span><div style="flex:1">�ҵĴ���</div><span>\u203A</span></div><div class="form-row" data-go="account"><span>\uD83D\uDD10</span><div style="flex:1">�˺Ź���</div><span>\u203A</span></div></div>
-            <div class="card"><div class="card-title">����</div><div class="form-row"><span>\uD83D\uDCDA</span><div style="flex:1">�γ���ƻ�</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFC6</span><div style="flex:1">�ɾ�</div><span>\u203A</span></div><div class="form-row" data-go="settings"><span>\u2699\uFE0F</span><div style="flex:1">����</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDCAC</span><div style="flex:1">�û�����</div><span>\u203A</span></div><div class="form-row" onclick="window.customerService()"><span>\uD83C\uDFDE\uFE0F</span><div style="flex:1">��ϵ�ͷ�</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDEE1\uFE0F</span><div style="flex:1">��˽����</div><span>\u203A</span></div></div>
-            <div class="card"><div class="form-row" id="logout-btn" style="border-bottom:none;justify-content:center;"><span>\uD83D\uDEAA</span><div style="flex:1;text-align:center;color:var(--red);font-size:16px;">�˳���¼</div><span></span></div></div>
+            <div class="card"><div class="card-title">账号</div><div class="form-row" data-go="profile-setup"><span>\uD83D\uDC68\u200D</span><div style="flex:1">个人资料</div><span>\u203A</span></div><div class="form-row" data-go="monitor"><span>\uD83D\uDCF3</span><div style="flex:1">我的数据</div><span>\u203A</span></div><div class="form-row" data-go="coin"><span>\uD83E\uDE99</span><div style="flex:1">健康币</div><span>${storage.signStreak()+2} 枚 \u203A</span></div><div class="form-row" data-go="services"><span>\uD83D\uDCB3</span><div style="flex:1">付费服务</div><span>\u203A</span></div><div class="form-row" data-go="myrx"><span>\uD83D\uDCCB</span><div style="flex:1">我的处方</div><span>\u203A</span></div><div class="form-row" data-go="account"><span>\uD83D\uDD10</span><div style="flex:1">账号管理</div><span>\u203A</span></div></div>
+            <div class="card"><div class="card-title">更多</div><div class="form-row"><span>\uD83D\uDCDA</span><div style="flex:1">课程与计划</div><span>\u203A</span></div><div class="form-row"><span>\uD83C\uDFC6</span><div style="flex:1">成就</div><span>\u203A</span></div><div class="form-row" data-go="settings"><span>\u2699\uFE0F</span><div style="flex:1">设置</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDCAC</span><div style="flex:1">用户反馈</div><span>\u203A</span></div><div class="form-row" onclick="window.customerService()"><span>\uD83C\uDFDE\uFE0F</span><div style="flex:1">联系客服</div><span>\u203A</span></div><div class="form-row"><span>\uD83D\uDEE1\uFE0F</span><div style="flex:1">隐私政策</div><span>\u203A</span></div></div>
+            <div class="card"><div class="form-row" id="logout-btn" style="border-bottom:none;justify-content:center;"><span>\uD83D\uDEAA</span><div style="flex:1;text-align:center;color:var(--red);font-size:16px;">退出登录</div><span></span></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
     app.querySelector('#logout-btn').onclick = logout;
@@ -1509,28 +2030,28 @@ PAGES.me = (app) => {
 
 
 
-// ���� ���ʹ���ҳ�� ����
+// ── 资质管理页面 ──
 PAGES.qualifications = (app) => {
-    setNavTitle('���ʹ���');
+    setNavTitle('资质管理');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">���ʹ���</div><div class="header-subtitle">�ϴ�רҵ�����ļ�����˺�ɿ���</div></div></div>
-            <div class="card"><div class="card-title">�ϴ�����</div>
-                <div class="form-group"><label>��������</label>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">资质管理</div><div class="header-subtitle">上传专业资质文件，审核后可开方</div></div></div>
+            <div class="card"><div class="card-title">上传资质</div>
+                <div class="form-group"><label>资质类型</label>
                     <select id="qual-type" class="form-input">
-                        <option value="doctor_cert">ִҵҽʦ֤</option>
-                        <option value="nutritionist_cert">Ӫ��ʦ�ʸ�֤</option>
-                        <option value="title_cert">ְ��֤��</option>
+                        <option value="doctor_cert">执业医师证</option>
+                        <option value="nutritionist_cert">营养师资格证</option>
+                        <option value="title_cert">职称证明</option>
                     </select>
                 </div>
-                <div class="form-group"><label>ѡ���ļ���ͼƬ��</label>
+                <div class="form-group"><label>选择文件（图片）</label>
                     <input type="file" id="qual-file" accept="image/*" style="padding:8px;border:1px solid #ddd;border-radius:8px;width:100%;" />
                 </div>
                 <div id="qual-preview" style="display:none;margin-bottom:8px;"></div>
-                <button class="btn btn-primary btn-block" id="qual-upload-btn">�ϴ�����</button>
+                <button class="btn btn-primary btn-block" id="qual-upload-btn">上传资质</button>
                 <div id="qual-upload-result"></div>
             </div>
-            <div class="card"><div class="card-title">�ҵ�����</div><div id="qual-list"><div class="text-muted" style="text-align:center;padding:12px;">������...</div></div></div>
+            <div class="card"><div class="card-title">我的资质</div><div id="qual-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
         </div>`;
     
     loadQualList();
@@ -1548,10 +2069,10 @@ PAGES.qualifications = (app) => {
     
     document.getElementById('qual-upload-btn').onclick = async function() {
         var type = document.getElementById('qual-type').value;
-        var labels = { doctor_cert:'ִҵҽʦ֤', nutritionist_cert:'Ӫ��ʦ�ʸ�֤', title_cert:'ְ��֤��' };
+        var labels = { doctor_cert:'执业医师证', nutritionist_cert:'营养师资格证', title_cert:'职称证明' };
         var input = document.getElementById('qual-file');
-        if(!input.files[0]){ toast('��ѡ���ļ�'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
+        if(!input.files[0]){ toast('请选择文件'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
         var reader = new FileReader();
         reader.onload = async function(e) {
             try {
@@ -1560,53 +2081,53 @@ PAGES.qualifications = (app) => {
                     body:JSON.stringify({ type, typeLabel:labels[type], fileName:input.files[0].name, fileData:e.target.result })
                 });
                 var d = await res.json();
-                if(d.ok){ toast('�ϴ��ɹ�'); loadQualList(); }else toast(d.error||'�ϴ�ʧ��');
-            } catch(e2){ toast('�������'); }
+                if(d.ok){ toast('上传成功'); loadQualList(); }else toast(d.error||'上传失败');
+            } catch(e2){ toast('网络错误'); }
         };
         reader.readAsDataURL(input.files[0]);
     };
 };
 
 async function loadQualList() {
-    if(!currentUser){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">���ȵ�¼</div>'; return; }
+    if(!currentUser){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">请先登录</div>'; return; }
     try {
         var res = await fetch(API_BASE+'/api/qualification/my',{headers:{Authorization:'Bearer '+currentUser.token}});
         var d = await res.json();
         if(d.data && d.data.length){
             document.getElementById('qual-list').innerHTML = d.data.map(function(q){
-                var badge = q.status==='approved' ? '<span style="color:green;">\u2705 ��ͨ��</span>' :
-                    q.status==='rejected' ? '<span style="color:red;">\u274C δͨ��'+(q.reviewNote?' - '+escapeHtml(q.reviewNote):'')+'</span>' :
-                    '<span style="color:orange;">\u23F3 �����</span>';
+                var badge = q.status==='approved' ? '<span style="color:green;">\u2705 已通过</span>' :
+                    q.status==='rejected' ? '<span style="color:red;">\u274C 未通过'+(q.reviewNote?' - '+escapeHtml(q.reviewNote):'')+'</span>' :
+                    '<span style="color:orange;">\u23F3 审核中</span>';
                 return '<div style="border-bottom:1px solid #f0f0f0;padding:8px 0;"><div style="display:flex;align-items:center;gap:8px;"><span>\uD83D\uDCC4</span><div style="flex:1;"><div>'+escapeHtml(q.typeLabel)+'</div><div style="font-size:12px;color:var(--gray);">'+escapeHtml(q.fileName)+'</div></div>'+badge+'</div>'+
                     (q.fileData ? '<div style="margin-top:4px;"><img src="'+q.fileData+'" style="max-width:100%;max-height:150px;border-radius:6px;" /></div>' : '')+'</div>';
             }).join('');
         } else {
-            document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">�������ʼ�¼</div>';
+            document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无资质记录</div>';
         }
-    } catch(e){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">����ʧ��</div>'; }
+    } catch(e){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">加载失败</div>'; }
 }
 
 
-// ���� �������ҳ�� ����
+// ── 收入管理页面 ──
 PAGES.income = (app) => {
-    setNavTitle('�������');
+    setNavTitle('收入管理');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">�������</div><div class="header-subtitle">�鿴���롢���ֽ�����</div></div></div>
-            <div class="card" id="income-summary"><div class="card-title">�������</div><div style="text-align:center;padding:16px;"><div class="text-muted">������...</div></div></div>
-            <div class="card"><div class="card-title">����</div>
-                <div class="form-group"><label>���ַ�ʽ</label>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">收入管理</div><div class="header-subtitle">查看收入、提现健康币</div></div></div>
+            <div class="card" id="income-summary"><div class="card-title">收入概览</div><div style="text-align:center;padding:16px;"><div class="text-muted">加载中...</div></div></div>
+            <div class="card"><div class="card-title">提现</div>
+                <div class="form-group"><label>提现方式</label>
                     <select id="wd-method" class="form-input">
-                        <option value="wechat">΢��</option>
-                        <option value="alipay">֧����</option>
+                        <option value="wechat">微信</option>
+                        <option value="alipay">支付宝</option>
                     </select>
                 </div>
-                <div class="form-group"><label>�տ��˺�</label><input id="wd-account" class="form-input" placeholder="�������տ��˺�" /></div>
-                <div class="form-group"><label>���ֽ������ң�</label><input id="wd-amount" class="form-input" type="number" min="10" placeholder="���10������" /></div>
-                <button class="btn btn-primary btn-block" id="wd-btn">����</button>
+                <div class="form-group"><label>收款账号</label><input id="wd-account" class="form-input" placeholder="请输入收款账号" /></div>
+                <div class="form-group"><label>提现金额（健康币）</label><input id="wd-amount" class="form-input" type="number" min="10" placeholder="最低10健康币" /></div>
+                <button class="btn btn-primary btn-block" id="wd-btn">提现</button>
                 <div id="wd-result"></div>
             </div>
-            <div class="card"><div class="card-title">���ּ�¼</div><div id="wd-history"><div class="text-muted" style="text-align:center;padding:12px;">������...</div></div></div>
+            <div class="card"><div class="card-title">提现记录</div><div id="wd-history"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
         </div>`;
     loadIncome();
     loadWithdrawals();
@@ -1615,18 +2136,18 @@ PAGES.income = (app) => {
         var amount = parseInt(document.getElementById('wd-amount').value);
         var method = document.getElementById('wd-method').value;
         var account = document.getElementById('wd-account').value.trim();
-        if(!amount || amount < 10){ toast('��������Ч�����10�����ң�'); return; }
-        if(!account){ toast('�������տ��˺�'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
+        if(!amount || amount < 10){ toast('请输入有效金额（最低10健康币）'); return; }
+        if(!account){ toast('请输入收款账号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
         try {
             var res = await fetch(API_BASE+'/api/doctor/withdraw', {
                 method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
                 body:JSON.stringify({amount,method,account})
             });
             var d = await res.json();
-            if(d.ok){ toast('���ֳɹ���'+d.amount+' ��������ת��'+(d.method==='wechat'?'΢��':'֧����')); loadIncome(); loadWithdrawals(); document.getElementById('wd-amount').value=''; document.getElementById('wd-account').value=''; }
-            else toast(d.error||'����ʧ��');
-        } catch(e){ toast('�������'); }
+            if(d.ok){ toast('提现成功！'+d.amount+' 健康币已转入'+(d.method==='wechat'?'微信':'支付宝')); loadIncome(); loadWithdrawals(); document.getElementById('wd-amount').value=''; document.getElementById('wd-account').value=''; }
+            else toast(d.error||'提现失败');
+        } catch(e){ toast('网络错误'); }
     };
 };
 
@@ -1636,11 +2157,11 @@ async function loadIncome() {
         var res = await fetch(API_BASE+'/api/doctor/income',{headers:{Authorization:'Bearer '+currentUser.token}});
         var d = await res.json();
         document.getElementById('income-summary').innerHTML = `
-            <div class="card-title">�������</div>
+            <div class="card-title">收入概览</div>
             <div style="display:flex;justify-content:space-around;padding:16px;text-align:center;">
-                <div><div style="font-size:28px;font-weight:700;color:var(--orange);">${d.totalIncome||0}</div><div class="text-muted" style="font-size:13px;">�ۼ�����</div></div>
-                <div><div style="font-size:28px;font-weight:700;color:var(--green);">${d.coins||0}</div><div class="text-muted" style="font-size:13px;">�������</div></div>
-                <div><div style="font-size:28px;font-weight:700;color:var(--gray);">${d.withdrawn||0}</div><div class="text-muted" style="font-size:13px;">������</div></div>
+                <div><div style="font-size:28px;font-weight:700;color:var(--orange);">${d.totalIncome||0}</div><div class="text-muted" style="font-size:13px;">累计收入</div></div>
+                <div><div style="font-size:28px;font-weight:700;color:var(--green);">${d.coins||0}</div><div class="text-muted" style="font-size:13px;">可用余额</div></div>
+                <div><div style="font-size:28px;font-weight:700;color:var(--gray);">${d.withdrawn||0}</div><div class="text-muted" style="font-size:13px;">已提现</div></div>
             </div>`;
     } catch(e){}
 }
@@ -1653,33 +2174,33 @@ async function loadWithdrawals() {
         var container = document.getElementById('wd-history');
         if(d.data && d.data.length){
             container.innerHTML = d.data.map(function(w){
-                var badge = w.status==='approved' ? '<span style="color:green;">\u2705 �ѵ���</span>' :
-                    w.status==='rejected' ? '<span style="color:red;">\u274C �Ѿܾ�</span>' : '<span style="color:orange;">\u23F3 �����</span>';
-                var methodLabel = w.method==='wechat' ? '΢��' : '֧����';
+                var badge = w.status==='approved' ? '<span style="color:green;">\u2705 已到账</span>' :
+                    w.status==='rejected' ? '<span style="color:red;">\u274C 已拒绝</span>' : '<span style="color:orange;">\u23F3 审核中</span>';
+                var methodLabel = w.method==='wechat' ? '微信' : '支付宝';
                 return '<div class="form-row" style="flex-wrap:wrap;"><span>\uD83D\uDCB0</span><div style="flex:1;"><div>'+methodLabel+' - \u00a5'+w.amount+'</div><div style="font-size:12px;color:var(--gray);">'+(w.createdAt?new Date(w.createdAt).toLocaleString('zh-CN'):'')+'</div></div>'+badge+'</div>';
             }).join('');
         } else {
-            container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">�������ּ�¼</div>';
+            container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无提现记录</div>';
         }
     } catch(e){}
 }
 
 
-// ���� ���ܴ�������ҳ�� ����
+// ── 智能处方生成页面 ──
 PAGES['ai-prescription'] = (app) => {
-    setNavTitle('���ܴ�������');
+    setNavTitle('智能处方生成');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">���ܴ�������</div><div class="header-subtitle">���뻼���ֻ��ţ�AI�Զ������˶�����</div></div></div>
-            <div class="card"><div class="card-title">ѡ����</div>
-                <div class="form-row"><input id="ai-patient-input" class="form-input" placeholder="���뻼���ֻ���" style="flex:1;" /><button class="btn btn-primary" id="ai-search-btn" style="padding:6px 12px;">����</button></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">智能处方生成</div><div class="header-subtitle">输入患者手机号，AI自动生成运动处方</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="ai-patient-input" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="ai-search-btn" style="padding:6px 12px;">搜索</button></div>
                 <div id="ai-patient-info"></div>
             </div>
             <div id="ai-form" style="display:none;">
-                <div class="card"><div class="card-title">��������</div><div id="ai-health-summary"></div></div>
-                <button class="btn btn-primary btn-block" id="ai-generate-btn">?? �������ɴ���</button>
-                <div id="ai-result" class="card" style="display:none;"><div class="card-title">���ɵĴ���</div><div id="ai-prescription-content"></div>
-                <button class="btn btn-primary btn-block" id="ai-send-btn" style="margin-top:8px;">?? ���ʹ���������</button></div>
+                <div class="card"><div class="card-title">健康评估</div><div id="ai-health-summary"></div></div>
+                <button class="btn btn-primary btn-block" id="ai-generate-btn">🤖 智能生成处方</button>
+                <div id="ai-result" class="card" style="display:none;"><div class="card-title">生成的处方</div><div id="ai-prescription-content"></div>
+                <button class="btn btn-primary btn-block" id="ai-send-btn" style="margin-top:8px;">📤 发送处方到患者</button></div>
             </div>
         </div>`;
     
@@ -1687,9 +2208,9 @@ PAGES['ai-prescription'] = (app) => {
     
     app.querySelector('#ai-search-btn').onclick = function(){
         var phone = app.querySelector('#ai-patient-input').value.trim();
-        if(!phone){ toast('�������ֻ���'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
-        app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">������...</div>';
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">搜索中...</div>';
         fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone),{headers:{Authorization:'Bearer '+currentUser.token}})
             .then(function(r){return r.json();})
             .then(function(d){
@@ -1698,27 +2219,27 @@ PAGES['ai-prescription'] = (app) => {
                     var records = d.dailyRecords || {};
                     var today = new Date().toISOString().slice(0,10);
                     var h = records[today] || {};
-                    app.querySelector('#ai-patient-info').innerHTML = '<div class="form-row" style="border:1px solid var(--orange-light);border-radius:8px;padding:10px;margin-top:8px;"><div class="avatar orange">??</div><div style="flex:1;"><div style="font-weight:600;font-size:16px;">'+escapeHtml(d.patient.name||'δ����')+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+'</div></div></div>';
+                    app.querySelector('#ai-patient-info').innerHTML = '<div class="form-row" style="border:1px solid var(--orange-light);border-radius:8px;padding:10px;margin-top:8px;"><div class="avatar orange">👤</div><div style="flex:1;"><div style="font-weight:600;font-size:16px;">'+escapeHtml(d.patient.name||'未命名')+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+'</div></div></div>';
                     app.querySelector('#ai-form').style.display = 'block';
                     app.querySelector('#ai-health-summary').innerHTML = `
                         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-                            <div class="info-pill green"><div class="fs-28 fw-600">${h.heartRate||'--'}</div><div style="font-size:12px;">����</div></div>
-                            <div class="info-pill orange"><div class="fs-28 fw-600">${h.bloodPressure||'--'}</div><div style="font-size:12px;">Ѫѹ</div></div>
-                            <div class="info-pill purple"><div class="fs-28 fw-600">${h.bloodOxygen||'--'}</div><div style="font-size:12px;">Ѫ��</div></div>
-                            <div class="info-pill blue"><div class="fs-28 fw-600">${h.bloodSugar||'--'}</div><div style="font-size:12px;">Ѫ��</div></div>
+                            <div class="info-pill green"><div class="fs-28 fw-600">${h.heartRate||'--'}</div><div style="font-size:12px;">心率</div></div>
+                            <div class="info-pill orange"><div class="fs-28 fw-600">${h.bloodPressure||'--'}</div><div style="font-size:12px;">血压</div></div>
+                            <div class="info-pill purple"><div class="fs-28 fw-600">${h.bloodOxygen||'--'}</div><div style="font-size:12px;">血氧</div></div>
+                            <div class="info-pill blue"><div class="fs-28 fw-600">${h.bloodSugar||'--'}</div><div style="font-size:12px;">血糖</div></div>
                         </div>
-                        <div style="font-size:13px;color:var(--gray);">���Ͻ����������Ի��߽����ϴ���¼</div>`;
+                        <div style="font-size:13px;color:var(--gray);">以上健康数据来自患者今日上传记录</div>`;
                 } else {
-                    app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">δ�ҵ����û�</div>';
+                    app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该用户</div>';
                 }
             })
-            .catch(function(){ app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">����ʧ��</div>'; });
+            .catch(function(){ app.querySelector('#ai-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">搜索失败</div>'; });
     };
     
     app.querySelector('#ai-generate-btn').onclick = async function(){
-        if(!currentPatientPhone){ toast('������������'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
-        app.querySelector('#ai-generate-btn').textContent = '? ������...';
+        if(!currentPatientPhone){ toast('请先搜索患者'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        app.querySelector('#ai-generate-btn').textContent = '⏳ 生成中...';
         app.querySelector('#ai-generate-btn').disabled = true;
         try {
             var res = await fetch(API_BASE+'/api/doctor/generate-prescription', {
@@ -1730,50 +2251,50 @@ PAGES['ai-prescription'] = (app) => {
                 var rx = d.prescription;
                 var itemsHtml = (rx.items||[]).map(function(i){ return '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);margin-bottom:6px;"><div style="font-weight:600;">'+escapeHtml(i.icon)+' '+escapeHtml(i.name)+'</div><div style="font-size:14px;color:var(--gray);">'+escapeHtml(i.detail)+'</div></div>'; }).join('');
                 app.querySelector('#ai-prescription-content').innerHTML = `
-                    <div style="margin-bottom:8px;"><span class="badge" style="color:${rx.healthLevel==='����'?'green':rx.healthLevel==='һ��'?'orange':'red'};">�����ȼ�: ${rx.healthLevel} (${rx.healthScore}��)</span></div>
-                    <div style="margin-bottom:8px;"><strong>��������:</strong> �� ${rx.maxHeartRate} ��/��</div>
-                    <div style="margin-bottom:8px;"><strong>Ƶ��:</strong> ${rx.frequency} | <strong>ʱ��:</strong> ${rx.duration}</div>
-                    <div style="margin-bottom:8px;"><strong>ǿ��:</strong> ${rx.intensity}</div>
+                    <div style="margin-bottom:8px;"><span class="badge" style="color:${rx.healthLevel==='良好'?'green':rx.healthLevel==='一般'?'orange':'red'};">健康等级: ${rx.healthLevel} (${rx.healthScore}分)</span></div>
+                    <div style="margin-bottom:8px;"><strong>限制心率:</strong> ≤ ${rx.maxHeartRate} 次/分</div>
+                    <div style="margin-bottom:8px;"><strong>频率:</strong> ${rx.frequency} | <strong>时长:</strong> ${rx.duration}</div>
+                    <div style="margin-bottom:8px;"><strong>强度:</strong> ${rx.intensity}</div>
                     <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
                     ${itemsHtml}
                     <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
-                    <div style="margin-bottom:8px;"><strong>ע������:</strong> ${escapeHtml(rx.cautions)}</div>
-                    <div><strong>Ӫ������:</strong> ${escapeHtml(rx.dietAdvice)}</div>`;
+                    <div style="margin-bottom:8px;"><strong>注意事项:</strong> ${escapeHtml(rx.cautions)}</div>
+                    <div><strong>营养建议:</strong> ${escapeHtml(rx.dietAdvice)}</div>`;
                 app.querySelector('#ai-result').style.display = 'block';
-                toast('�������ɳɹ�');
+                toast('处方生成成功');
             } else {
-                toast(d.error||'����ʧ��');
+                toast(d.error||'生成失败');
             }
-        } catch(e){ toast('�������'); }
-        app.querySelector('#ai-generate-btn').textContent = '?? �������ɴ���';
+        } catch(e){ toast('网络错误'); }
+        app.querySelector('#ai-generate-btn').textContent = '🤖 智能生成处方';
         app.querySelector('#ai-generate-btn').disabled = false;
     };
     
     app.querySelector('#ai-send-btn').onclick = async function(){
-        if(!currentPatientPhone || !currentUser){ toast('�����������������'); return; }
+        if(!currentPatientPhone || !currentUser){ toast('请先完成搜索和生成'); return; }
         var rxContent = app.querySelector('#ai-prescription-content').innerHTML;
         var items = [];
         app.querySelectorAll('#ai-prescription-content .prescription-box').forEach(function(el){
             var parts = el.querySelectorAll('div');
             if(parts.length >= 2){
-                items.push({name: parts[0].textContent.replace(/[???????????????]/g,'').trim(), detail: parts[1].textContent.trim()});
+                items.push({name: parts[0].textContent.replace(/[🥋🚶🧘🙆🛏️🫁🏃]/g,'').trim(), detail: parts[1].textContent.trim()});
             }
         });
-        app.querySelector('#ai-send-btn').textContent = '? ������...';
+        app.querySelector('#ai-send-btn').textContent = '⏳ 发送中...';
         try {
             var res = await fetch(API_BASE+'/api/doctor/send-prescription', {
                 method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
-                body:JSON.stringify({patientPhone:currentPatientPhone, prescription:{items:items, doctor:'��������', date:new Date().toISOString().slice(0,10)}, doctorNotes:'���ܴ�������'})
+                body:JSON.stringify({patientPhone:currentPatientPhone, prescription:{items:items, doctor:'智能生成', date:new Date().toISOString().slice(0,10)}, doctorNotes:'智能处方生成'})
             });
             var d = await res.json();
-            if(d.ok){ toast('�����ѷ��͵�����'); } else toast(d.error||'����ʧ��');
-        } catch(e){ toast('�������'); }
-        app.querySelector('#ai-send-btn').textContent = '?? ���ʹ���������';
+            if(d.ok){ toast('处方已发送到患者'); } else toast(d.error||'发送失败');
+        } catch(e){ toast('网络错误'); }
+        app.querySelector('#ai-send-btn').textContent = '📤 发送处方到患者';
     };
 }
 
 
-// ���� ��������ͳ�� ����
+// ── 今日诊疗统计 ──
 function loadTodayStats(app) {
     if(!currentUser){ return; }
     fetch(API_BASE+'/api/doctor/today-stats', {headers:{Authorization:'Bearer '+currentUser.token}})
@@ -1782,30 +2303,30 @@ function loadTodayStats(app) {
             if(d && d.ok){
                 var el = document.getElementById('work-stat');
                 if(el) el.innerHTML = '<div style="display:flex;justify-content:space-around;padding:8px;text-align:center;">' +
-                    '<div><div style="font-size:28px;font-weight:700;color:var(--orange);">'+d.prescriptionsToday+'</div><div class="text-muted" style="font-size:13px;">���տ���</div></div>' +
-                    '<div><div style="font-size:28px;font-weight:700;color:var(--green);">'+d.chatPatientsToday+'</div><div class="text-muted" style="font-size:13px;">��ѯ����</div></div>' +
+                    '<div><div style="font-size:28px;font-weight:700;color:var(--orange);">'+d.prescriptionsToday+'</div><div class="text-muted" style="font-size:13px;">今日开方</div></div>' +
+                    '<div><div style="font-size:28px;font-weight:700;color:var(--green);">'+d.chatPatientsToday+'</div><div class="text-muted" style="font-size:13px;">咨询患者</div></div>' +
                     '</div>';
             }
         });
 }
 
 
-// ���� ���Ƶ���ҳ�� ����
+// ── 诊疗档案页面 ──
 PAGES['patient-records'] = (app) => {
-    setNavTitle('���Ƶ���');
+    setNavTitle('诊疗档案');
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">���Ƶ���</div><div class="header-subtitle">�鿴���ߵ������������Ƽ�¼</div></div></div>
-            <div class="card"><div class="card-title">ѡ����</div>
-                <div class="form-row"><input id="rec-phone" class="form-input" placeholder="���뻼���ֻ���" style="flex:1;" /><button class="btn btn-primary" id="rec-search-btn" style="padding:6px 12px;">����</button></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">诊疗档案</div><div class="header-subtitle">查看患者的连续健康诊疗记录</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="rec-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="rec-search-btn" style="padding:6px 12px;">搜索</button></div>
             </div>
             <div id="rec-content"></div>
         </div>`;
     
     app.querySelector('#rec-search-btn').onclick = function(){
         var phone = app.querySelector('#rec-phone').value.trim();
-        if(!phone){ toast('�������ֻ���'); return; }
-        if(!currentUser){ toast('���ȵ�¼'); return; }
+        if(!phone){ toast('请输入手机号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
         loadPatientRecords(app, phone);
     };
     
@@ -1817,51 +2338,51 @@ PAGES['patient-records'] = (app) => {
 
 async function loadPatientRecords(app, phone) {
     var content = app.querySelector('#rec-content');
-    content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">������...</div>';
+    content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">加载中...</div>';
     try {
         var res = await fetch(API_BASE+'/api/doctor/patient-records/'+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
         var d = await res.json();
         if(d.data && d.data.length){
-            var html = '<div class="card" style="margin-bottom:8px;background:var(--orange-light);"><div style="text-align:center;padding:8px;"><strong>?? �� '+d.data.length+' �����Ƽ�¼</strong></div></div>';
+            var html = '<div class="card" style="margin-bottom:8px;background:var(--orange-light);"><div style="text-align:center;padding:8px;"><strong>📋 共 '+d.data.length+' 条诊疗记录</strong></div></div>';
             d.data.forEach(function(r){
                 var rx = r.prescription || {};
                 var itemsHtml = '';
                 if(rx.items && rx.items.length){
                     itemsHtml = rx.items.map(function(i){ return '<div style="font-size:14px;margin:4px 0;">'+(i.icon||'')+' <strong>'+(i.name||'')+'</strong> - '+(i.detail||'')+'</div>'; }).join('');
                 }
-                var goalHtml = rx.goal ? '<div style="font-size:14px;margin:4px 0;"><strong>�˶�Ŀ��:</strong> '+escapeHtml(rx.goal)+'</div>' : '';
-                var dietHtml = rx.dietAdvice ? '<div style="margin-top:6px;padding:6px;background:#fff8f0;border-radius:6px;font-size:13px;"><strong>Ӫ������:</strong> '+escapeHtml(rx.dietAdvice)+'</div>' : '';
-                html += '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div><div style="font-weight:600;font-size:15px;">'+(r.savedAt?new Date(r.savedAt).toLocaleString('zh-CN'):'δ֪ʱ��')+'</div><div style="font-size:12px;color:var(--gray);">�� '+(r.doctorName||'ҽʦ')+' ����</div></div></div>'+goalHtml+itemsHtml+dietHtml+(r.doctorNotes?'<div style="margin-top:6px;padding:6px;background:var(--orange-light);border-radius:6px;font-size:13px;"><strong>ҽʦ��ע:</strong> '+escapeHtml(r.doctorNotes)+'</div>':'')+'</div>';
+                var goalHtml = rx.goal ? '<div style="font-size:14px;margin:4px 0;"><strong>运动目标:</strong> '+escapeHtml(rx.goal)+'</div>' : '';
+                var dietHtml = rx.dietAdvice ? '<div style="margin-top:6px;padding:6px;background:#fff8f0;border-radius:6px;font-size:13px;"><strong>营养建议:</strong> '+escapeHtml(rx.dietAdvice)+'</div>' : '';
+                html += '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div><div style="font-weight:600;font-size:15px;">'+(r.savedAt?new Date(r.savedAt).toLocaleString('zh-CN'):'未知时间')+'</div><div style="font-size:12px;color:var(--gray);">由 '+(r.doctorName||'医师')+' 开具</div></div></div>'+goalHtml+itemsHtml+dietHtml+(r.doctorNotes?'<div style="margin-top:6px;padding:6px;background:var(--orange-light);border-radius:6px;font-size:13px;"><strong>医师备注:</strong> '+escapeHtml(r.doctorNotes)+'</div>':'')+'</div>';
             });
             content.innerHTML = html;
         } else {
-            content.innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">??</div><div class="text-muted">�û����������Ƽ�¼</div></div>';
+            content.innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">📋</div><div class="text-muted">该患者暂无诊疗记录</div></div>';
         }
     } catch(e){
-        content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">����ʧ��</div>';
+        content.innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">加载失败</div>';
     }
 }
-// ========== ��ʼ�� ==========
+// ========== 初始化 ==========
 
-// ���� ���ѷ���ҳ�� ����
+// ── 付费服务页面 ──
 PAGES.services = (app) => {
-  setNavTitle("���ѷ���");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">�ҵĽ�����</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">�� 0 ö</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">��ֵ������</button></div></div><div class="card"><div class="card-title">ѡ�����</div><div id="svc-list"></div></div><div class="card"><div class="card-title">�ҵ��ѹ�����</div><div id="my-services"></div></div></div>';
+  setNavTitle("付费服务");
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的健康币</div><div id="coin-balance" style="font-size:24px;font-weight:700;color:var(--orange);">¥ 0 枚</div><div style="margin-top:8px;"><button class="btn btn-primary btn-block" onclick="navigate(\'coin\')">充值健康币</button></div></div><div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div><div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div></div>';
   // Load coin balance from server
   if(currentUser){
     fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
-      document.getElementById("coin-balance").innerHTML = "\u00a5 " + (d.coins||0) + " ö";
+      document.getElementById("coin-balance").innerHTML = "\u00a5 " + (d.coins||0) + " 枚";
     });
   }
   // Load services list
   fetch(API_BASE+"/api/services").then(function(r){return r.json();}).then(function(d){
     if(d.data&&d.data.length){
       var html = d.data.map(function(s){
-        return '<div class="prescription-box" style="margin-bottom:10px;border-color:var(--orange);background:var(--orange-light);color:var(--text);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>'+escapeHtml(s.name)+'</strong><br><span style="font-size:14px;">\u00a5 '+s.price+' ������</span><br><span style="font-size:13px;color:var(--gray);">'+escapeHtml(s.description||"")+'</span><br><span style="font-size:12px;color:var(--gray);">�Ѳ��� '+(s.enrolled||0)+' / '+s.maxParticipants+' ��</span></div><button class="btn btn-primary" style="font-size:14px;padding:8px 16px;" onclick=\'purchaseService("'+s.id+'")\'>��������</button></div></div>';
+        return '<div class="prescription-box" style="margin-bottom:10px;border-color:var(--orange);background:var(--orange-light);color:var(--text);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><strong>'+escapeHtml(s.name)+'</strong><br><span style="font-size:14px;">\u00a5 '+s.price+' 健康币</span><br><span style="font-size:13px;color:var(--gray);">'+escapeHtml(s.description||"")+'</span><br><span style="font-size:12px;color:var(--gray);">已参与 '+(s.enrolled||0)+' / '+s.maxParticipants+' 人</span></div><button class="btn btn-primary" style="font-size:14px;padding:8px 16px;" onclick=\'purchaseService("'+s.id+'")\'>立即购买</button></div></div>';
       }).join("");
       document.getElementById("svc-list").innerHTML = html;
     } else {
-      document.getElementById("svc-list").innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">��</div>';
+      document.getElementById("svc-list").innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">无</div>';
     }
   });
   // Load purchased services
@@ -1872,106 +2393,106 @@ PAGES.services = (app) => {
           return '<div class="badge badge-green" style="font-size:13px;padding:6px 10px;margin:4px;display:inline-block;">\u2705 '+escapeHtml(s.name)+'</div>';
         }).join("");
       } else {
-        document.getElementById("my-services").innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">��</div>';
+        document.getElementById("my-services").innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">无</div>';
       }
     });
   }
 };
 
 window.purchaseService = async function(id) {
-  if(!currentUser){toast("���ȵ�¼");return;}
+  if(!currentUser){toast("请先登录");return;}
   var res = await fetch(API_BASE+"/api/service/purchase",{
     method:"POST", headers:{"Content-Type":"application/json",Authorization:"Bearer "+currentUser.token},
     body:JSON.stringify({serviceId:id})
   });
   var data = await res.json();
-  if(data.ok){toast("����ɹ� \u2705");navigate("services");}else{toast(data.error||"����ʧ��");}
+  if(data.ok){toast("购买成功 \u2705");navigate("services");}else{toast(data.error||"购买失败");}
 };
 
-// ���� �ҵ��˶�����ҳ�� ����
+// ── 我的运动处方页面 ──
 PAGES.myrx = (app) => {
-  setNavTitle("�ҵ��˶�����");
-  app.innerHTML = '<div class="container"><div id="rx-content"><div class="chart-placeholder">������...</div></div></div>';
-  if(!currentUser){document.getElementById("rx-content").innerHTML='<div class="text-muted" style="padding:20px;">���ȵ�¼</div>';return;}
+  setNavTitle("我的运动处方");
+  app.innerHTML = '<div class="container"><div id="rx-content"><div class="chart-placeholder">加载中...</div></div></div>';
+  if(!currentUser){document.getElementById("rx-content").innerHTML='<div class="text-muted" style="padding:20px;">请先登录</div>';return;}
   fetch(API_BASE+"/api/my-prescription",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
     var rx = d.data;
     if(rx&&rx.items){
       document.getElementById("rx-content").innerHTML =
-        '<div class="card"><div class="card-title">�����˶�����</div>'+
+        '<div class="card"><div class="card-title">智能运动处方</div>'+
         '<div class="prescription-box" style="border-color:var(--green);background:var(--green-light);color:var(--green-dark);margin-bottom:12px;">'+
-        '<div><strong>�˶�Ŀ��:</strong> '+escapeHtml(rx.goal||"")+'</div>'+
-        '<div><strong>ǿ��:</strong> '+escapeHtml(rx.intensity||"")+' | <strong>����:</strong> \u2264'+escapeHtml(rx.maxHeartRate||"")+'</div>'+
-        '<div><strong>Ƶ��:</strong> '+escapeHtml(rx.frequency||"")+' | <strong>ʱ��:</strong> '+escapeHtml(rx.duration||"")+'</div></div>'+
-        '<div class="card-title">ѵ����Ŀ</div>'+
+        '<div><strong>运动目标:</strong> '+escapeHtml(rx.goal||"")+'</div>'+
+        '<div><strong>强度:</strong> '+escapeHtml(rx.intensity||"")+' | <strong>心率:</strong> \u2264'+escapeHtml(rx.maxHeartRate||"")+'</div>'+
+        '<div><strong>频率:</strong> '+escapeHtml(rx.frequency||"")+' | <strong>时长:</strong> '+escapeHtml(rx.duration||"")+'</div></div>'+
+        '<div class="card-title">训练项目</div>'+
         (rx.items||[]).map(function(i){return '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);color:var(--text);margin-bottom:8px;"><div style="font-size:18px;font-weight:600;">'+(i.icon||"")+' '+escapeHtml(i.name)+'</div><div style="font-size:15px;color:var(--gray);">'+escapeHtml(i.detail)+'</div></div>';}).join("")+
-        (rx.cautions?'<div class="card-title">ע������</div><div class="prescription-box" style="border-color:var(--red);background:#fffafa;color:var(--red);">'+escapeHtml(rx.cautions)+'</div>':'')+
-        (rx.dietAdvice?'<div class="card-title">Ӫ������</div><div class="prescription-box" style="border-color:#fce4d6;background:#fff8f0;color:#92400e;">'+escapeHtml(rx.dietAdvice)+'</div>':'')+
+        (rx.cautions?'<div class="card-title">注意事项</div><div class="prescription-box" style="border-color:var(--red);background:#fffafa;color:var(--red);">'+escapeHtml(rx.cautions)+'</div>':'')+
+        (rx.dietAdvice?'<div class="card-title">营养建议</div><div class="prescription-box" style="border-color:#fce4d6;background:#fff8f0;color:#92400e;">'+escapeHtml(rx.dietAdvice)+'</div>':'')+
         '</div>';
     } else {
-      document.getElementById("rx-content").innerHTML = '<div class="text-muted" style="padding:20px;">���޴���������ϵ����Ա�򽡿�ʦ</div>';
+      document.getElementById("rx-content").innerHTML = '<div class="text-muted" style="padding:20px;">暂无处方，请联系管理员或健康师</div>';
     }
   });
 };
 
-// ���� �˺Ź�������ע���� ����
+// ── 账号管理（含注销） ──
 
-// ���� ���ã���ע���˻�������
+// ── 设置（含注销账户）──
 PAGES.settings = (app) => {
-  setNavTitle("����");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">�˻���Ϣ</div>'+
-    '<div style="font-size:16px;margin-bottom:4px;">�ֻ���: <strong>'+(currentUser?escapeHtml(currentUser.phone):"")+'</strong></div>'+
-    '<div style="font-size:16px;margin-bottom:16px;">����: <strong>'+(currentUser?escapeHtml(currentUser.role||"�����û�"):"")+'</strong></div></div>'+
-    '<div class="card"><div class="card-title" style="color:var(--red);">Σ�ղ���</div>'+
-    '<button class="btn btn-danger btn-block" id="delete-account-btn">\uD83D\DDD1\uFE0F ע���˻�</button>'+
-    '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:center;">ע������ֻ��ſ�����ע�ᣬ���������ݽ�������ɾ��</div></div></div>';
+  setNavTitle("设置");
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">账户信息</div>'+
+    '<div style="font-size:16px;margin-bottom:4px;">手机号: <strong>'+(currentUser?escapeHtml(currentUser.phone):"")+'</strong></div>'+
+    '<div style="font-size:16px;margin-bottom:16px;">身份: <strong>'+(currentUser?escapeHtml(currentUser.role||"银龄用户"):"")+'</strong></div></div>'+
+    '<div class="card"><div class="card-title" style="color:var(--red);">危险操作</div>'+
+    '<button class="btn btn-danger btn-block" id="delete-account-btn">\uD83D\DDD1\uFE0F 注销账户</button>'+
+    '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:center;">注销后该手机号可重新注册，但所有数据将被永久删除</div></div></div>';
   document.getElementById("delete-account-btn").onclick = async function(){
-    if(!currentUser){toast("���ȵ�¼");return;}
-    var result = await modal({title:"ȷ��ע��",content:"ȷ��Ҫע���˻���\n�ֻ��� '+escapeHtml(currentUser.phone)+' �����ͷ�\n�������ݽ�������ɾ����",confirmText:"ȷ��ע��",confirmColor:"#e8504a"});
+    if(!currentUser){toast("请先登录");return;}
+    var result = await modal({title:"确认注销",content:"确定要注销账户吗？\n手机号 '+escapeHtml(currentUser.phone)+' 将被释放\n所有数据将被永久删除！",confirmText:"确认注销",confirmColor:"#e8504a"});
     if(result.confirm){
       try {
         var res = await fetch(API_BASE+"/api/account/delete",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}});
         var data = await res.json();
-        if(data.ok){toast("�˻���ע�����ֻ��ſ�����ע�� \u2705");logout();}else{toast(data.error||"ע��ʧ��");}
-      } catch(e){toast("�������");}
+        if(data.ok){toast("账户已注销，手机号可重新注册 \u2705");logout();}else{toast(data.error||"注销失败");}
+      } catch(e){toast("网络错误");}
     }
   };
 };
 
 PAGES.account = (app) => {
-  setNavTitle("�˺Ź���");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">�ҵ�����</div>'+
-    '<div style="font-size:18px;margin-bottom:8px;">��ǰ����: <strong>'+(currentUser?escapeHtml(currentUser.role||"�����û�"):"")+'</strong></div>'+
-    '<div style="font-size:13px;color:var(--gray);margin-bottom:16px;">ÿ���ֻ���ֻ�ܰ�һ�����ݣ����������ע���˻�</div></div>'+
-    '<div class="card"><div class="card-title" style="color:var(--red);">Σ�ղ���</div>'+
-    '<button class="btn btn-danger btn-block" id="delete-account-btn">ע���˻�</button>'+
-    '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:center;">ע�����˻����ݽ�������ɾ�����Ҳ��ɻָ�</div></div></div>';
+  setNavTitle("账号管理");
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">我的身份</div>'+
+    '<div style="font-size:18px;margin-bottom:8px;">当前身份: <strong>'+(currentUser?escapeHtml(currentUser.role||"银龄用户"):"")+'</strong></div>'+
+    '<div style="font-size:13px;color:var(--gray);margin-bottom:16px;">每个手机号只能绑定一个身份，如需更换请注销账户</div></div>'+
+    '<div class="card"><div class="card-title" style="color:var(--red);">危险操作</div>'+
+    '<button class="btn btn-danger btn-block" id="delete-account-btn">注销账户</button>'+
+    '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:center;">注销后账户数据将被永久删除，且不可恢复</div></div></div>';
   document.getElementById("delete-account-btn").onclick = async function(){
-    if(!currentUser){toast("���ȵ�¼");return;}
-    var result = await modal({title:"ȷ��ע��",content:"ȷ��Ҫע���˻���\n�������ݽ�������ɾ����",confirmText:"ȷ��ע��",confirmColor:"#e8504a"});
+    if(!currentUser){toast("请先登录");return;}
+    var result = await modal({title:"确认注销",content:"确定要注销账户吗？\n所有数据将被永久删除！",confirmText:"确认注销",confirmColor:"#e8504a"});
     if(result.confirm){
       try {
         var res = await fetch(API_BASE+"/api/account/delete",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}});
         var data = await res.json();
-        if(data.ok){toast("�˻���ע��");logout();}else{toast(data.error||"ע��ʧ��");}
-      } catch(e){toast("�������");}
+        if(data.ok){toast("账户已注销");logout();}else{toast(data.error||"注销失败");}
+      } catch(e){toast("网络错误");}
     }
   };
 };
 
-// ���� �����ҳ�ֵҳ�棨΢��/֧����������
+// ── 健康币充值页面（微信/支付宝）──
 PAGES.recharge = (app) => {
-  setNavTitle("��ֵ����");
-  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">ѡ���ֵ���</div>'+
+  setNavTitle("充值中心");
+  app.innerHTML = '<div class="container"><div class="card"><div class="card-title">选择充值金额</div>'+
     '<div class="grid-2">'+
-    '<div class="feature-tile orange" onclick="selectRecharge(10)"><div class="fi">10</div><div class="fn">10 ö</div></div>'+
-    '<div class="feature-tile green" onclick="selectRecharge(30)"><div class="fi">30</div><div class="fn">30 ö</div></div>'+
-    '<div class="feature-tile orange" onclick="selectRecharge(50)"><div class="fi">50</div><div class="fn">50 ö</div></div>'+
-    '<div class="feature-tile green" onclick="selectRecharge(100)"><div class="fi">100</div><div class="fn">100 ö</div></div>'+
+    '<div class="feature-tile orange" onclick="selectRecharge(10)"><div class="fi">10</div><div class="fn">10 枚</div></div>'+
+    '<div class="feature-tile green" onclick="selectRecharge(30)"><div class="fi">30</div><div class="fn">30 枚</div></div>'+
+    '<div class="feature-tile orange" onclick="selectRecharge(50)"><div class="fi">50</div><div class="fn">50 枚</div></div>'+
+    '<div class="feature-tile green" onclick="selectRecharge(100)"><div class="fi">100</div><div class="fn">100 枚</div></div>'+
     '</div>'+
-    '<div style="margin-top:12px;text-align:center;font-size:16px;">ѡ����: <strong id="selected-amount">50</strong> ö</div>'+
-    '<div class="card"><div class="card-title">ѡ��֧����ʽ</div>'+
-    '<div class="form-row" onclick="doRecharge(\'΢��\')"><span style="font-size:24px;">\uD83D\uDCB1</span><div style="flex:1;font-size:16px;">΢��֧��</div><span>\u203A</span></div>'+
-    '<div class="form-row" onclick="doRecharge(\'֧����\')"><span style="font-size:24px;">\uD83D\uDCB0</span><div style="flex:1;font-size:16px;">֧����</div><span>\u203A</span></div>'+
+    '<div style="margin-top:12px;text-align:center;font-size:16px;">选择金额: <strong id="selected-amount">50</strong> 枚</div>'+
+    '<div class="card"><div class="card-title">选择支付方式</div>'+
+    '<div class="form-row" onclick="doRecharge(\'微信\')"><span style="font-size:24px;">\uD83D\uDCB1</span><div style="flex:1;font-size:16px;">微信支付</div><span>\u203A</span></div>'+
+    '<div class="form-row" onclick="doRecharge(\'支付宝\')"><span style="font-size:24px;">\uD83D\uDCB0</span><div style="flex:1;font-size:16px;">支付宝</div><span>\u203A</span></div>'+
     '</div><div id="recharge-result" style="margin-top:8px;text-align:center;"></div></div>';
   selectRecharge(50);
 };
@@ -1982,17 +2503,17 @@ function selectRecharge(amount) {
 }
 
 async function doRecharge(method) {
-  if(!currentUser){toast("���ȵ�¼");return;}
+  if(!currentUser){toast("请先登录");return;}
   var amount = window._rechargeAmount || 50;
-  document.getElementById("recharge-result").innerHTML = '<div class="chart-placeholder">\uD83D\uDD04 ���ڴ���'+method+'֧��...</div>';
+  document.getElementById("recharge-result").innerHTML = '<div class="chart-placeholder">\uD83D\uDD04 正在处理'+method+'支付...</div>';
   try {
     var res = await fetch(API_BASE+"/api/coins/recharge",{
       method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+currentUser.token},
       body:JSON.stringify({amount:amount,method:method})
     });
     var data = await res.json();
-    if(data.ok){toast(method+"��ֵ�ɹ� \u2705");navigate("services");}else{toast(data.error||"��ֵʧ��");}
-  } catch(e){toast("�������");}
+    if(data.ok){toast(method+"充值成功 \u2705");navigate("services");}else{toast(data.error||"充值失败");}
+  } catch(e){toast("网络错误");}
 }
 
 
@@ -2001,9 +2522,9 @@ async function searchFriend() {
   var resultDiv = document.getElementById('search-result');
   if(!input||!resultDiv) return;
   var phone = input.value.trim();
-  if(!phone) { toast('�������ֻ���'); return; }
-  if(!currentUser){toast('���ȵ�¼');return;}
-  resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">������...</div>';
+  if(!phone) { toast('请输入手机号'); return; }
+  if(!currentUser){toast('请先登录');return;}
+  resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">搜索中...</div>';
   try {
     var res = await fetch(API_BASE + '/api/user/search?phone=' + encodeURIComponent(phone), {
       headers: { Authorization: 'Bearer ' + currentUser.token }
@@ -2011,36 +2532,36 @@ async function searchFriend() {
     var data = await res.json();
     if(data.user) {
       var u = data.user;
-      var roleLabel = u.role || '��ͨ�û�';
-      if(roleLabel === '�����û�') roleLabel = '������û�';
-      else if(roleLabel === '��ŮȺ��') roleLabel = '��Ů���û�';
-      else if(roleLabel === 'ҽ����Ӫ��ʦ') roleLabel = 'Ӫ��ʦ���û�';
+      var roleLabel = u.role || '普通用户';
+      if(roleLabel === '银龄用户') roleLabel = '老年端用户';
+      else if(roleLabel === '子女群体') roleLabel = '子女端用户';
+      else if(roleLabel === '医生与营养师') roleLabel = '营养师端用户';
       var nickname = '';
       try { 
         var pp = typeof u.data && u.data.profile && typeof u.data.profile === 'string' ? JSON.parse(u.data.profile) : (typeof u.data === 'object' && u.data ? u.data.profile || {} : {}); 
         nickname = pp.name || ''; 
       } catch(e) {}
-      resultDiv.innerHTML = '<div class="list-item" style="cursor:default;"><div class="avatar">??</div><div class="list-content"><div class="list-name">' + (nickname ? escapeHtml(nickname) + ' (' + escapeHtml(phone) + ')' : escapeHtml(phone)) + '</div><div class="list-desc" style="font-size:12px;color:var(--gray);">' + roleLabel + '</div></div><button class="btn btn-primary" id="add-friend-btn" style="padding:4px 10px;font-size:13px;">���Ӻ���</button></div>';
+      resultDiv.innerHTML = '<div class="list-item" style="cursor:default;"><div class="avatar">👤</div><div class="list-content"><div class="list-name">' + (nickname ? escapeHtml(nickname) + ' (' + escapeHtml(phone) + ')' : escapeHtml(phone)) + '</div><div class="list-desc" style="font-size:12px;color:var(--gray);">' + roleLabel + '</div></div><button class="btn btn-primary" id="add-friend-btn" style="padding:4px 10px;font-size:13px;">添加好友</button></div>';
       document.getElementById('add-friend-btn').onclick = async function() {
-        if(!currentUser){toast('���ȵ�¼');return;}
+        if(!currentUser){toast('请先登录');return;}
         try {
           var r = await fetch(API_BASE + '/api/friend/request', {
             method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer ' + currentUser.token},
             body:JSON.stringify({toPhone: phone})
           });
           var d = await r.json();
-          if(d.ok) { toast('���������ѷ���'); resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--green);">���������ѷ���</div>'; }
-          else toast(d.error || '����ʧ��');
+          if(d.ok) { toast('好友请求已发送'); resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;color:var(--green);">好友请求已发送</div>'; }
+          else toast(d.error || '添加失败');
         } catch(e) { document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������'); }
+        toast('网络错误'); }
       };
     } else {
-      resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">δ�ҵ����û�</div>';
+      resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">未找到该用户</div>';
     }
   } catch(e) {
-    resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">�������</div>';
+    resultDiv.innerHTML = '<div class="text-muted" style="padding:8px;text-align:center;">网络错误</div>';
     document.getElementById('back-to-em').onclick = function() { navigate('emergency'); };
-        toast('�������');
+        toast('网络错误');
   }
 }
 
@@ -2055,7 +2576,7 @@ function init() {
     if (saved) {
         try {
             currentUser = JSON.parse(saved);
-            // ����ͬ��������Ӱ���¼״̬
+            // 尝试同步，但不影响登录状态
             pullFromCloud().finally(() => {
                 if (!location.hash || location.hash === '#/index') navigate('home');
                 else render();
@@ -2073,27 +2594,27 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', init);
 
-// ��ϵ�ͷ�
+// 联系客服
 window.customerService = function() {
   var d = document.createElement("div");
   d.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;";
   d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:30px 24px;width:85%;max-width:300px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.2);">' +
-    '<div style="font-size:48px;margin-bottom:12px;">??</div>' +
-    '<div style="font-size:17px;font-weight:600;margin-bottom:12px;">��ϵ�ͷ�</div>' +
-    '<div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:20px;">����΢�Ź��ںţ�������ֱ�ӷ���Ϣ���ͷ�</div>' +
-    '<button onclick="this.parentNode.parentNode.remove()" style="background:#ff6b35;color:#fff;border:none;padding:10px 40px;border-radius:24px;font-size:16px;cursor:pointer;">��֪����</button>' +
+    '<div style="font-size:48px;margin-bottom:12px;">📧</div>' +
+    '<div style="font-size:17px;font-weight:600;margin-bottom:12px;">联系客服</div>' +
+    '<div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:20px;">返回微信公众号，您可以直接发消息给客服</div>' +
+    '<button onclick="this.parentNode.parentNode.remove()" style="background:#ff6b35;color:#fff;border:none;padding:10px 40px;border-radius:24px;font-size:16px;cursor:pointer;">我知道了</button>' +
   '</div>';
   document.body.appendChild(d);
 // Friend request actions
 function acceptFriend(phone){
-  if(!currentUser){toast('���ȵ�¼');return;}
+  if(!currentUser){toast('请先登录');return;}
   fetch(API_BASE+'/api/friend/accept',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
-    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('�ѽ���');render();}else toast(d.error||'����ʧ��');});
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已接受');render();}else toast(d.error||'操作失败');});
 }
 function rejectFriend(phone){
-  if(!currentUser){toast('���ȵ�¼');return;}
+  if(!currentUser){toast('请先登录');return;}
   fetch(API_BASE+'/api/friend/reject',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentUser.token},body:JSON.stringify({fromPhone:phone})})
-    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('�Ѿܾ�');render();}else toast(d.error||'����ʧ��');});
+    .then(function(r){return r.json();}).then(function(d){if(d.ok){toast('已拒绝');render();}else toast(d.error||'操作失败');});
 }
 
   d.onclick = function(e) { if(e.target===d) d.remove(); };
