@@ -462,7 +462,7 @@ async function loadLiveData() {
     var html = '<table class="admin-table"><tr><th>手机号</th><th>日期</th><th>心率</th><th>血压</th><th>血氧</th><th>血糖</th><th>步数</th><th>睡眠</th></tr>'+
       d.data.map(function(u){
         var r = u.record || {};
-        return '<tr><td>'+esc(u.phone)+'</td><td>'+(u.date||'-')+'</td><td>'+(r.heartRate||'-')+'</td><td>'+(r.bloodPressure||'-')+'</td><td>'+(r.bloodOxygen||'-')+'</td><td>'+(r.bloodSugar||'-')+'</td><td>'+(r.steps||'-')+'</td><td>'+(r.sleepHours||'-')+'</td></tr>';
+        return '<tr><td>'+esc(u.phone)+'</td><td>'+(u.date||'-')+'</td><td>'+(r.heartRate||'-')+'</td><td>'+(r.bloodPressure||r.bp||'-')+'</td><td>'+(r.bloodOxygen||'-')+'</td><td>'+(r.bloodSugar||'-')+'</td><td>'+(r.steps||'-')+'</td><td>'+(r.sleepHours||r.sleep||'-')+'</td></tr>';
       }).join('')+'</table>';
     document.getElementById('live-monitor').innerHTML = html;
   } else {

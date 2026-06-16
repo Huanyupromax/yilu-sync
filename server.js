@@ -1208,7 +1208,7 @@ app.get('/api/admin/live-data', adminAuth, async (req, res) => {
       var records = u.data?.dailyRecords || {};
       var todayData = records[today] || {};
       if(Object.keys(todayData).length > 0){
-        result.push({ phone: u.phone, date: today, record: todayData });
+        var rec = Object.assign({}, todayData); if(rec.bp && !rec.bloodPressure) rec.bloodPressure = rec.bp; if(rec.sleep && !rec.sleepHours) rec.sleepHours = rec.sleep; result.push({ phone: u.phone, date: today, record: rec });
       }
     });
     res.json({ data: result });
