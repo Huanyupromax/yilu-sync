@@ -1164,6 +1164,39 @@ app.post('/api/doctor/send-report', auth, async (req, res) => {
     res.json({ ok: true, message: '报告已发送' });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 资质管理 ──
+app.post('/api/qualification/upload', auth, async (req, res) => {
+  try {
+    const { type, typeLabel, fileName, fileData } = req.body;
+    if (!type || !fileData) return res.status(400).json({ error: '缺少参数' });
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const qual = { id: 'qual_' + Date.now(), phone: req.phone, userName: (user?.data?.profile?.name) || '', type, typeLabel: typeLabel || type, fileName: fileName || '未命名', fileData, status: 'pending', reviewNote: '', uploadedAt: new Date().toISOString(), reviewedAt: '' };
+    await qualificationsCollection.insertOne(qual);
+    res.json({ ok: true, id: qual.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/qualification/my', auth, async (req, res) => {
+  try { const quals = await qualificationsCollection.find({ phone: req.phone }).sort({ uploadedAt: -1 }).toArray(); res.json({ data: quals }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/qualification/certified', auth, async (req, res) => {
+  try { const user = await usersCollection.findOne({ phone: req.phone }); res.json({ certified: user?.certified === true }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/admin/qualifications', adminAuth, async (req, res) => {
+  try { const quals = await qualificationsCollection.find({}).sort({ uploadedAt: -1 }).toArray(); res.json({ data: quals }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/admin/qualification/review', adminAuth, async (req, res) => {
+  try {
+    const { id, status, reviewNote } = req.body;
+    if (!id || !status) return res.status(400).json({ error: '缺少参数' });
+    await qualificationsCollection.updateOne({ id }, { $set: { status, reviewNote: reviewNote || '', reviewedAt: new Date().toISOString() } });
+    if (status === 'approved') {
+      const qual = await qualificationsCollection.findOne({ id });
+      if (qual) { await usersCollection.updateOne({ phone: qual.phone }, { $set: { certified: true } }); }
+    }
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
