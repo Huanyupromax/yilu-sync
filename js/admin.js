@@ -574,7 +574,7 @@ pages.volunteer = async function() {
   };
 };
 async function loadVolunteerData() {
-  var d = await fetch('/api/admin/volunteer/data').then(function(r){return r.json();});
+  var d = await api('GET', '/volunteer/data');
   if(d.data && d.data.length) {
     var html = '<table class="admin-table"><tr><th>名称</th><th>地点</th><th>日期</th><th>时间</th><th>奖励/时</th><th>报名人数</th></tr>'+
       d.data.map(function(v){ 
