@@ -1,3 +1,43 @@
+
+pages.activities = async function() {
+  var app = document.getElementById('admin-app');
+  app.innerHTML = sidebarHtml('activities')+topbarHtml('亲子活动')+'<div class="admin-card"><div class="admin-card-title">发布活动</div>'+
+    '<div class="form-group"><label>活动名称</label><input id="act-name" placeholder="如：亲子健康挑战" /></div>'+
+    '<div class="form-group"><label>活动描述</label><textarea id="act-desc" rows="2" placeholder="活动内容介绍"></textarea></div>'+
+    '<div class="form-row-grid"><div class="form-group"><label>开始日期</label><input id="act-start" type="date" /></div>'+
+    '<div class="form-group"><label>结束日期</label><input id="act-end" type="date" /></div></div>'+
+    '<div class="form-row-grid"><div class="form-group"><label>打卡奖励 (健康币)</label><input id="act-checkin" type="number" value="5" /></div>'+
+    '<div class="form-group"><label>任务奖励 (健康币)</label><input id="act-task" type="number" value="10" /></div></div>'+
+    '<div class="form-group"><label>每日任务描述</label><input id="act-task-desc" placeholder="如：完成今日运动打卡" value="完成今日运动打卡" /></div>'+
+    '<button class="btn-admin btn-admin-primary" id="act-publish">发布活动</button></div>'+
+    '<div class="admin-card"><div class="admin-card-title">已发布活动</div><div id="activities-list"><div class="chart-placeholder">加载中...</div></div></div></div></div>';
+  setupNav();
+  loadActivities();
+  document.getElementById('act-publish').onclick = async function(){
+    var name = document.getElementById('act-name').value.trim();
+    if(!name){ toast('请填写活动名称'); return; }
+    var desc = document.getElementById('act-desc').value.trim();
+    var start = document.getElementById('act-start').value;
+    var end = document.getElementById('act-end').value;
+    var checkinReward = parseInt(document.getElementById('act-checkin').value) || 5;
+    var taskReward = parseInt(document.getElementById('act-task').value) || 10;
+    var taskDesc = document.getElementById('act-task-desc').value.trim() || '完成今日健康任务';
+    var res = await fetch('/api/activity/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,description:desc,startDate:start,endDate:end,checkinReward,taskReward,taskDescription:taskDesc}) });
+    var d = await res.json();
+    if(d.ok){ toast('活动已发布'); loadActivities(); }else{ toast('失败: '+(d.error||'')); }
+  };
+};
+async function loadActivities() {
+  var d = await fetch('/api/activities').then(function(r){return r.json();});
+  if(d.data && d.data.length) {
+    var html = '<table class="admin-table"><tr><th>名称</th><th>日期</th><th>打卡奖励</th><th>任务奖励</th><th>参与人数</th></tr>'+
+      d.data.map(function(a){ return '<tr><td>'+esc(a.name)+'</td><td>'+(a.startDate||'')+' ~ '+(a.endDate||'')+'</td><td>'+a.checkinReward+' 币</td><td>'+a.taskReward+' 币</td><td>'+(a.participants||0)+'</td></tr>'; }).join('')+'</table>';
+    document.getElementById('activities-list').innerHTML = html;
+  } else {
+    document.getElementById('activities-list').innerHTML = '<div class="chart-placeholder">暂无活动</div>';
+  }
+}
+
 const API = '/api/admin';
 var adminUser = null;
 
