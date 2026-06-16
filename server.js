@@ -806,7 +806,8 @@ app.get('/api/elderly/dashboard/:phone', auth, async (req, res) => {
     const dates = Object.keys(dailyRecords).sort().slice(-7);
     const recentRecords = {};
     dates.forEach(function(date){ recentRecords[date] = dailyRecords[date]; });
-    res.json({ ok: true, name: profile.name || user.phone, phone: user.phone, profile, healthData, todayRecord, recentRecords, courses });
+    var rx = user.prescription ? JSON.parse(user.prescription) : null;
+    res.json({ ok: true, name: profile.name || user.phone, phone: user.phone, profile, healthData, todayRecord, recentRecords, courses, prescription: rx });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
