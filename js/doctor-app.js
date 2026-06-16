@@ -455,7 +455,7 @@ PAGES.data = (app) => {
             <div class="card"><div class="card-title">选择患者</div>
                 <div class="form-row"><input id="trend-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="trend-search-btn" style="padding:6px 12px;">搜索</button></div>
             </div>
-            <div id="trend-period-bar" style="display:none;" class="tab-bar" style="margin-bottom:8px;">
+            <div id="trend-period-bar" style="display:none;margin-bottom:8px;"><div style="display:flex;gap:4px;margin-bottom:4px;">
                 <button class="btn btn-sm" data-period="day" style="flex:1;">日</button>
                 <button class="btn btn-sm btn-primary" data-period="week" style="flex:1;">周</button>
                 <button class="btn btn-sm" data-period="month" style="flex:1;">月</button>
@@ -473,8 +473,10 @@ PAGES.data = (app) => {
             </div>
         </div>`;
     var currentPhone = '';
+var trendRefreshTimer = null;
     app.querySelector('#trend-search-btn').onclick = function(){ loadTrends(app); };
     app.querySelector('#trend-phone').onkeypress = function(e){ if(e.key==='Enter') loadTrends(app); };
+    app.querySelector('#trend-refresh-btn').onclick = function(){ if(currentPhone) loadTrends(app); };
     app.querySelector('#gen-month-report').onclick = function(){ generateReport(app, currentPhone, 'month'); };
     app.querySelector('#gen-quarter-report').onclick = function(){ generateReport(app, currentPhone, 'quarter'); };
 };
@@ -501,6 +503,17 @@ function loadTrends(app) {
     fetch(API_BASE+'/api/doctor/patient-trends/'+encodeURIComponent(phone)+'?period='+period, {headers:{Authorization:'Bearer '+currentUser.token}})
         .then(function(r){return r.json();})
         .then(function(d){
+            var now = new Date();
+                var timeStr = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+                var rt = app.querySelector('#trend-refresh-time');
+                if(rt) rt.textContent = '最近更新: '+timeStr;
+                // Auto-refresh every 30 seconds
+                if(trendRefreshTimer) clearInterval(trendRefreshTimer);
+                trendRefreshTimer = setInterval(function(){
+                    var phoneEl = document.getElementById('trend-phone');
+                    if(!phoneEl){ clearInterval(trendRefreshTimer); trendRefreshTimer = null; return; }
+                    loadTrends(app);
+                }, 30000);
             if(d.trends && d.trends.dates && d.trends.dates.length){
                 renderTrendChart(app, '心率 (次/分)', d.trends.dates, d.trends.heartRate, '#ff6b35', 50, 120);
                 renderTrendChart(app, '血糖 (mmol/L)', d.trends.dates, d.trends.bloodSugar, '#22c55e', 3, 10);
