@@ -1954,6 +1954,84 @@ async function loadQualList() {
         }
     } catch(e){ document.getElementById('qual-list').innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;color:var(--red);">加载失败</div>'; }
 }
+
+
+// ── 收入管理页面 ──
+PAGES.income = (app) => {
+    setNavTitle('收入管理');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">收入管理</div><div class="header-subtitle">查看收入、提现健康币</div></div></div>
+            <div class="card" id="income-summary"><div class="card-title">收入概览</div><div style="text-align:center;padding:16px;"><div class="text-muted">加载中...</div></div></div>
+            <div class="card"><div class="card-title">提现</div>
+                <div class="form-group"><label>提现方式</label>
+                    <select id="wd-method" class="form-input">
+                        <option value="wechat">微信</option>
+                        <option value="alipay">支付宝</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>收款账号</label><input id="wd-account" class="form-input" placeholder="请输入收款账号" /></div>
+                <div class="form-group"><label>提现金额（健康币）</label><input id="wd-amount" class="form-input" type="number" min="10" placeholder="最低10健康币" /></div>
+                <button class="btn btn-primary btn-block" id="wd-btn">提现</button>
+                <div id="wd-result"></div>
+            </div>
+            <div class="card"><div class="card-title">提现记录</div><div id="wd-history"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
+        </div>`;
+    loadIncome();
+    loadWithdrawals();
+    
+    document.getElementById('wd-btn').onclick = async function() {
+        var amount = parseInt(document.getElementById('wd-amount').value);
+        var method = document.getElementById('wd-method').value;
+        var account = document.getElementById('wd-account').value.trim();
+        if(!amount || amount < 10){ toast('请输入有效金额（最低10健康币）'); return; }
+        if(!account){ toast('请输入收款账号'); return; }
+        if(!currentUser){ toast('请先登录'); return; }
+        try {
+            var res = await fetch(API_BASE+'/api/doctor/withdraw', {
+                method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                body:JSON.stringify({amount,method,account})
+            });
+            var d = await res.json();
+            if(d.ok){ toast('提现申请已提交，等待管理员审核'); loadIncome(); loadWithdrawals(); document.getElementById('wd-amount').value=''; document.getElementById('wd-account').value=''; }
+            else toast(d.error||'提现失败');
+        } catch(e){ toast('网络错误'); }
+    };
+};
+
+async function loadIncome() {
+    if(!currentUser){ return; }
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/income',{headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        document.getElementById('income-summary').innerHTML = `
+            <div class="card-title">收入概览</div>
+            <div style="display:flex;justify-content:space-around;padding:16px;text-align:center;">
+                <div><div style="font-size:28px;font-weight:700;color:var(--orange);">${d.totalIncome||0}</div><div class="text-muted" style="font-size:13px;">累计收入</div></div>
+                <div><div style="font-size:28px;font-weight:700;color:var(--green);">${d.coins||0}</div><div class="text-muted" style="font-size:13px;">可用余额</div></div>
+                <div><div style="font-size:28px;font-weight:700;color:var(--gray);">${d.withdrawn||0}</div><div class="text-muted" style="font-size:13px;">已提现</div></div>
+            </div>`;
+    } catch(e){}
+}
+
+async function loadWithdrawals() {
+    if(!currentUser){ return; }
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/withdrawals',{headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        var container = document.getElementById('wd-history');
+        if(d.data && d.data.length){
+            container.innerHTML = d.data.map(function(w){
+                var badge = w.status==='approved' ? '<span style="color:green;">\u2705 已到账</span>' :
+                    w.status==='rejected' ? '<span style="color:red;">\u274C 已拒绝</span>' : '<span style="color:orange;">\u23F3 审核中</span>';
+                var methodLabel = w.method==='wechat' ? '微信' : '支付宝';
+                return '<div class="form-row" style="flex-wrap:wrap;"><span>\uD83D\uDCB0</span><div style="flex:1;"><div>'+methodLabel+' - \u00a5'+w.amount+'</div><div style="font-size:12px;color:var(--gray);">'+(w.createdAt?new Date(w.createdAt).toLocaleString('zh-CN'):'')+'</div></div>'+badge+'</div>';
+            }).join('');
+        } else {
+            container.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;">暂无提现记录</div>';
+        }
+    } catch(e){}
+}
 // ========== 初始化 ==========
 
 // ── 付费服务页面 ──

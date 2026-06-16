@@ -50,6 +50,7 @@ async function connectDB() {
     volunteerCollection = db.collection('volunteer');
     volunteerAppCollection = db.collection('volunteer_apps');
     qualificationsCollection = db.collection('qualifications');
+    withdrawalsCollection = db.collection('withdrawals');
     await usersCollection.createIndex({ phone: 1 }, { unique: true });
     await groupsCollection.createIndex({ members: 1 });
     await groupMessagesCollection.createIndex({ groupId: 1, timestamp: -1 });
@@ -953,34 +954,39 @@ app.get('/api/admin/volunteer/data', adminAuth, async (req, res) => {
 });
 
 
-// ── 资质管理 ──
-app.post('/api/qualification/upload', auth, async (req, res) => {
+
+// ── 医师收入管理 ──
+app.get('/api/doctor/income', auth, async (req, res) => {
+  try { const user = await usersCollection.findOne({ phone: req.phone }); res.json({ totalIncome: user?.doctorIncome || 0, coins: user?.coins || 0, withdrawn: user?.doctorWithdrawn || 0 }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/doctor/withdraw', auth, async (req, res) => {
   try {
-    const { type, typeLabel, fileName, fileData } = req.body;
-    if (!type || !fileData) return res.status(400).json({ error: '缺少参数' });
+    const { amount, method, account } = req.body;
+    if (!amount || !method || !account) return res.status(400).json({ error: '缺少参数' });
+    var amt = parseInt(amount);
+    if (amt < 10) return res.status(400).json({ error: '最低提现10健康币' });
     const user = await usersCollection.findOne({ phone: req.phone });
-    const qual = { id: 'qual_' + Date.now(), phone: req.phone, userName: (user?.data?.profile?.name) || '', type, typeLabel: typeLabel || type, fileName: fileName || '未命名', fileData, status: 'pending', reviewNote: '', uploadedAt: new Date().toISOString(), reviewedAt: '' };
-    await qualificationsCollection.insertOne(qual);
-    res.json({ ok: true, id: qual.id });
+    if ((user?.coins || 0) < amt) return res.status(400).json({ error: '健康币不足' });
+    const wd = { id: 'wd_' + Date.now(), phone: req.phone, amount: amt, method, account, status: 'pending', createdAt: new Date().toISOString(), processedAt: '' };
+    await withdrawalsCollection.insertOne(wd);
+    res.json({ ok: true, id: wd.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.get('/api/qualification/my', auth, async (req, res) => {
-  try { const quals = await qualificationsCollection.find({ phone: req.phone }).sort({ uploadedAt: -1 }).toArray(); res.json({ data: quals }); } catch (err) { res.status(500).json({ error: err.message }); }
+app.get('/api/doctor/withdrawals', auth, async (req, res) => {
+  try { const wds = await withdrawalsCollection.find({ phone: req.phone }).sort({ createdAt: -1 }).toArray(); res.json({ data: wds }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.get('/api/qualification/certified', auth, async (req, res) => {
-  try { const user = await usersCollection.findOne({ phone: req.phone }); res.json({ certified: user?.certified === true }); } catch (err) { res.status(500).json({ error: err.message }); }
+app.get('/api/admin/withdrawals', adminAuth, async (req, res) => {
+  try { const wds = await withdrawalsCollection.find({}).sort({ createdAt: -1 }).toArray(); res.json({ data: wds }); } catch (err) { res.status(500).json({ error: err.message }); }
 });
-app.get('/api/admin/qualifications', adminAuth, async (req, res) => {
-  try { const quals = await qualificationsCollection.find({}).sort({ uploadedAt: -1 }).toArray(); res.json({ data: quals }); } catch (err) { res.status(500).json({ error: err.message }); }
-});
-app.post('/api/admin/qualification/review', adminAuth, async (req, res) => {
+app.post('/api/admin/withdrawal/process', adminAuth, async (req, res) => {
   try {
-    const { id, status, reviewNote } = req.body;
+    const { id, status } = req.body;
     if (!id || !status) return res.status(400).json({ error: '缺少参数' });
-    await qualificationsCollection.updateOne({ id }, { $set: { status, reviewNote: reviewNote || '', reviewedAt: new Date().toISOString() } });
+    const wd = await withdrawalsCollection.findOne({ id });
+    if (!wd) return res.status(404).json({ error: '记录不存在' });
+    await withdrawalsCollection.updateOne({ id }, { $set: { status, processedAt: new Date().toISOString() } });
     if (status === 'approved') {
-      const qual = await qualificationsCollection.findOne({ id });
-      if (qual) { await usersCollection.updateOne({ phone: qual.phone }, { $set: { certified: true } }); }
+      await usersCollection.updateOne({ phone: wd.phone }, { $inc: { coins: -wd.amount, doctorWithdrawn: wd.amount }, $push: { coinRecords: { type: 'withdraw', amount: -wd.amount, method: wd.method, time: new Date().toISOString() } } });
     }
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
