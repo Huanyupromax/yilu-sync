@@ -1575,7 +1575,13 @@ PAGES.me = (app) => {
             <div class="card"><div class="form-row" id="logout-btn" style="border-bottom:none;justify-content:center;"><span>\uD83D\uDEAA</span><div style="flex:1;text-align:center;color:var(--red);font-size:16px;">退出登录</div><span></span></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
-    app.querySelector('#logout-btn').onclick = logout;
+    // Load bound elderly from server
+  if(currentUser && !localStorage.getItem('boundElderlyPhone')){
+    fetch(API_BASE+'/api/bind/elderly',{headers:{Authorization:'Bearer '+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
+      if(d.ok && d.phone) localStorage.setItem('boundElderlyPhone', d.phone);
+    });
+  }
+  app.querySelector('#logout-btn').onclick = logout;
     app.querySelector('#bind-elderly-btn').onclick = showBindElderlyDialog;
 };
 
@@ -1589,14 +1595,26 @@ function showBindElderlyDialog() {
   d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:24px;width:85%;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.2);">' +
     '<div style="font-size:18px;font-weight:600;margin-bottom:16px;">\u7ed1\u5b9a\u8001\u4eba</div>' +
     '<div style="margin-bottom:12px;"><input id="bind-phone-input" class="form-input" placeholder="\u8f93\u5165\u8001\u4eba\u624b\u673a\u53f7" value="' + escapeHtml(boundPhone) + '" style="width:100%;" /></div>' +
-    (boundPhone ? '<div style="font-size:13px;color:var(--green);margin-bottom:12px;">\u5df2\u7ed1\u5b9a\uff1a' + escapeHtml(boundPhone) + '</div>' : '') +
+    (boundPhone ? '<div style="font-size:13px;color:var(--green);margin-bottom:12px;">\u5df2\u7ed1\u5b9a\uff1a' + escapeHtml(boundPhone) + ' <button class="btn btn-ghost" style="font-size:12px;padding:2px 8px;color:var(--red);" id="unbind-btn">\u89e3\u7ed1</button></div>' : '') +
     '<div style="display:flex;gap:8px;"><button class="btn btn-primary" style="flex:1;padding:10px;" id="bind-confirm-btn">\u4fdd\u5b58</button><button class="btn btn-ghost" style="flex:1;padding:10px;" id="bind-cancel-btn">\u53d6\u6d88</button></div></div>';
   document.body.appendChild(d);
   d.querySelector('#bind-confirm-btn').onclick = function(){
     var phone = d.querySelector('#bind-phone-input').value.trim();
     if(!phone){ toast('\u8bf7\u8f93\u5165\u624b\u673a\u53f7'); return; }
     localStorage.setItem('boundElderlyPhone', phone);
+    if(currentUser){
+      fetch(API_BASE+'/api/bind/elderly',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},body:JSON.stringify({elderlyPhone:phone})});
+    }
     toast('\u5df2\u7ed1\u5b9a\u8001\u4eba\uff1a' + phone);
+    d.remove();
+  };
+  d.querySelector('#unbind-btn').onclick = function(){
+    if(!confirm('\u786e\u5b9a\u89e3\u7ed1\u5417\uff1f')) return;
+    localStorage.removeItem('boundElderlyPhone');
+    if(currentUser){
+      fetch(API_BASE+'/api/bind/elderly',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},body:JSON.stringify({elderlyPhone:''})});
+    }
+    toast('\u5df2\u89e3\u7ed1');
     d.remove();
   };
   d.querySelector('#bind-cancel-btn').onclick = function(){ d.remove(); };
@@ -1611,11 +1629,15 @@ PAGES.services = (app) => {
     '<div class="card"><div class="card-title">为老人购买</div>'+
     '<div style="margin-bottom:6px;"><input id="elderly-phone-input" class="form-input" placeholder="输入老人手机号" style="width:100%;" value="' + (localStorage.getItem('boundElderlyPhone')||'') + '" /></div>'+
     '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">已在「我的-绑定老人」中设置过的话，手机号会自动填入</div></div>'+
-    '<div class="card"><div class="card-title">选择服务</div><div id="svc-list"></div></div>'+
-    '<div class="card"><div class="card-title">我的已购服务</div><div id="my-services"></div></div>'+
     '<div class="card"><div class="card-title">为老人购买课程</div>'+
     '<div style="display:flex;gap:8px;margin-bottom:6px;"><button class="btn btn-primary" id="load-courses-btn" style="padding:6px 12px;">查询课程</button></div>'+
     '<div id="courses-for-elderly"><div class="text-muted" style="text-align:center;padding:8px;">点击查询课程按钮查看可购买的课程</div></div></div></div>';
+  // Load bound elderly phone from server
+  if(currentUser && !localStorage.getItem('boundElderlyPhone')){
+    fetch(API_BASE+'/api/bind/elderly',{headers:{Authorization:'Bearer '+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
+      if(d.ok && d.phone) localStorage.setItem('boundElderlyPhone', d.phone);
+    });
+  }
   // Load coin balance from server
   if(currentUser){
     fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
