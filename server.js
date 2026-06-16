@@ -733,6 +733,7 @@ app.post('/api/doctor/send-prescription', auth, async (req, res) => {
       doctorNotes: doctorNotes || '',
       doctorName: doctor.data?.profile?.name || '营养师',
       doctorPhone: req.phone,
+      doctorPhone: req.phone,
       savedAt: new Date().toISOString()
     });
     res.json({ ok: true, message: '处方已发送' });
@@ -1030,6 +1031,23 @@ app.post('/api/doctor/generate-prescription', auth, async (req, res) => {
       items: exercises, frequency: freq, duration: dur,
       cautions, dietAdvice: '均衡饮食，多摄入蛋白质和膳食纤维'
     }});
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 医师今日统计 ──
+app.get('/api/doctor/today-stats', auth, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    // Count prescriptions sent today by this doctor
+    var rxToday = DB_prescriptions.filter(function(p){ return p.doctorPhone === req.phone && p.savedAt && p.savedAt.slice(0,10) === today; }).length;
+    // Count unique patients who chatted today
+    var fromSet = await messagesCollection.distinct('from', { to: req.phone, timestamp: { $gte: today+'T00:00:00.000Z', $lte: today+'T23:59:59.999Z' } });
+    var toSet = await messagesCollection.distinct('to', { from: req.phone, timestamp: { $gte: today+'T00:00:00.000Z', $lte: today+'T23:59:59.999Z' } });
+    var all = {};
+    fromSet.forEach(function(p){ if(p !== req.phone) all[p] = true; });
+    toSet.forEach(function(p){ if(p !== req.phone) all[p] = true; });
+    var chatCount = Object.keys(all).length;
+    res.json({ ok: true, prescriptionsToday: rxToday, chatPatientsToday: chatCount });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 app.listen(PORT, () => {

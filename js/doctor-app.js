@@ -377,6 +377,7 @@ PAGES.home = (app) => {
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
     renderBoundPatients(app);
+    loadTodayStats(app);
     app.querySelector('#bind-patient-btn').onclick = function(){
         var phone = app.querySelector('#bind-patient-input').value.trim();
         if(!phone){ toast('请输入手机号'); return; }
@@ -2143,6 +2144,23 @@ PAGES['ai-prescription'] = (app) => {
         } catch(e){ toast('网络错误'); }
         app.querySelector('#ai-send-btn').textContent = '📤 发送处方到患者';
     };
+}
+
+
+// ── 今日诊疗统计 ──
+function loadTodayStats(app) {
+    if(!currentUser){ return; }
+    fetch(API_BASE+'/api/doctor/today-stats', {headers:{Authorization:'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if(d && d.ok){
+                var el = document.getElementById('work-stat');
+                if(el) el.innerHTML = '<div style="display:flex;justify-content:space-around;padding:8px;text-align:center;">' +
+                    '<div><div style="font-size:28px;font-weight:700;color:var(--orange);">'+d.prescriptionsToday+'</div><div class="text-muted" style="font-size:13px;">今日开方</div></div>' +
+                    '<div><div style="font-size:28px;font-weight:700;color:var(--green);">'+d.chatPatientsToday+'</div><div class="text-muted" style="font-size:13px;">咨询患者</div></div>' +
+                    '</div>';
+            }
+        });
 }
 // ========== 初始化 ==========
 
