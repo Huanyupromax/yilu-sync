@@ -212,7 +212,7 @@ function logout() {
 // ========== 路由 ==========
 const TABBAR_PAGES = ['home', 'sport', 'data', 'messages', 'me'];
 const TABBAR_LIST = [
-    { key: 'home', text: '健康', icon: '❤️' },
+    { key: 'home', text: '工作台', icon: '💼' },
     { key: 'sport', text: '患者', icon: '👥' },
     { key: 'data', text: '数据', icon: '📈' },
     { key: 'messages', text: '消息', icon: '💬' },
@@ -354,45 +354,22 @@ async function registerWithRole(phone, password, role) {
 
 // 健康首页 (图片路径已修正)
 PAGES.home = (app) => {
+    setNavTitle('工作台');
     const p = storage.getProfile();
-    const name = (p && p.name) ? p.name : '张叔';
-    const signed = storage.isSignedToday();
-    const streak = storage.signStreak();
-    const h = storage.getHealthData();
+    const name = (p && p.name) ? p.name : '医师';
     app.innerHTML = `
         <div class="container">
-            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">颐路相伴</div><div class="header-subtitle">您好，${escapeHtml(name)} · 今日宜慢走</div></div></div>
-            <div class="banner"><div class="emoji">🍎</div><div><div class="t">健康小贴士</div><div class="s">老人健康与饮食的八大原则</div></div></div>
-            <div class="card"><div class="card-title">今日打卡</div><div class="row space-between"><div><div class="fs-40 fw-600 text-orange" id="sign-status">${signed ? '今日已签到' : '还未签到'}</div><div class="text-muted mt-12">连续签到 <span id="streak-num">${streak}</span> 天</div></div><button class="btn btn-primary" id="sign-btn">${signed ? '已签到' : '去签到'}</button></div><div class="progress orange mt-20"><div id="sign-bar" style="width:${signed ? 100 : 30}%"></div></div></div>
-            <div class="grid-2"><div class="feature-tile orange" data-go="prescription"><div class="fi">🏃</div><div class="fn">运动方案</div></div><div class="feature-tile green" data-go="courses"><div class="fi">📘</div><div class="fn">我的课程</div></div></div>
-            <div class="emergency-tile" data-go="emergency"><div class="ei">📞</div><div class="et"><div class="en">一键紧急呼叫</div><div class="ed">一键通知紧急联系人与120急救</div></div><div class="ec">›</div></div>
-            <div class="card"><div class="card-title">今日健康数据</div><div class="ring-metric"><div class="ring"><div class="ring-text"><span class="big">${h.heartRate}</span>次/分</div></div><div><div class="fs-32 fw-600">心率 · 正常</div><div class="text-muted fs-28">今日均值 ${h.heartRate} 次/分</div></div></div><div class="row space-between mt-20"><div><div class="text-muted fs-28">血压</div><div class="fs-36 fw-600 text-green">${h.bloodPressure}</div></div><div><div class="text-muted fs-28">步数</div><div class="fs-36 fw-600 text-orange">${h.steps}</div></div><button class="btn btn-ghost" data-go="monitor" style="padding:6px 12px;">详情</button></div></div>
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">工作台</div><div class="header-subtitle">您好，${escapeHtml(name)} · 今日工作</div></div></div>
+            <div class="banner"><div class="emoji">💼</div><div><div class="t">待办事项</div><div class="s">暂无待办，请关注患者动态</div></div></div>
+            <div class="grid-2">
+                <div class="feature-tile orange" data-go="sport"><div class="fi">👥</div><div class="fn">患者管理</div></div>
+                <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">📊</div><div class="fn">查看数据</div></div>
+                <div class="feature-tile purple" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送处方</div></div>
+                <div class="feature-tile blue" data-go="messages"><div class="fi">💬</div><div class="fn">消息</div></div>
+            </div>
+            <div class="card"><div class="card-title">快速统计</div><div id="work-stat"><div class="text-muted" style="text-align:center;padding:12px;">连接服务器后可查看统计数据</div></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
-  // 从服务器加载健康币
-  if(typeof currentUser !== 'undefined' && currentUser){
-    fetch(API_BASE+"/api/coins",{headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
-      var el = document.getElementById("coin-count-me");
-      if(el) el.textContent = (d.coins||0) + " 枚";
-    });
-  }
-    app.querySelector('#sign-btn').onclick = () => {
-        if (storage.isSignedToday()) { toast('今天已经签到了'); return; }
-        if (storage.addSignToday()) {
-          // 签到奖励发送到服务器
-          if(currentUser){
-            fetch(API_BASE+"/api/coins/signin",{method:"POST",headers:{Authorization:"Bearer "+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
-              if(d.ok){console.log("签到+10健康币");}
-            });
-          }
-
-            toast('签到成功 +10 健康币');
-            app.querySelector('#sign-status').textContent = '今日已签到';
-            app.querySelector('#streak-num').textContent = storage.signStreak();
-            app.querySelector('#sign-bar').style.width = '100%';
-            app.querySelector('#sign-btn').textContent = '已签到';
-        }
-    };
 };
 
 PAGES.sport = (app) => {
