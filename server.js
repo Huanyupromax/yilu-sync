@@ -45,6 +45,8 @@ async function connectDB() {
     coursesCollection = db.collection('courses');
     friendsCollection = db.collection('friends');
     messagesCollection = db.collection('messages');
+    activitiesCollection = db.collection('activities');
+    activitySignupsCollection = db.collection('activity_signups');
     await usersCollection.createIndex({ phone: 1 }, { unique: true });
     await groupsCollection.createIndex({ members: 1 });
     await groupMessagesCollection.createIndex({ groupId: 1, timestamp: -1 });
@@ -827,6 +829,74 @@ app.get('/api/bind/elderly', auth, async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+
+// ── 亲子互动活动 ──
+app.post('/api/activity/create', async (req, res) => {
+  try {
+    const { name, description, startDate, endDate, checkinReward, taskReward, taskDescription } = req.body;
+    if (!name) return res.status(400).json({ error: '缺少活动名称' });
+    const id = 'activity_' + Date.now();
+    await activitiesCollection.insertOne({ id, name, description: description || '', startDate: startDate || '', endDate: endDate || '', checkinReward: parseInt(checkinReward) || 5, taskReward: parseInt(taskReward) || 10, taskDescription: taskDescription || '完成今日健康任务', active: true, participants: 0, createdAt: new Date().toISOString() });
+    res.json({ ok: true, id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/activities', async (req, res) => {
+  try { const acts = await activitiesCollection.find({ active: { $ne: false } }).sort({ createdAt: -1 }).toArray(); res.json({ data: acts }); } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/activity/signup', auth, async (req, res) => {
+  try {
+    const { activityId } = req.body;
+    if (!activityId) return res.status(400).json({ error: '缺少活动ID' });
+    const exist = await activitySignupsCollection.findOne({ activityId, phone: req.phone });
+    if (exist) return res.json({ ok: true, message: '已报名' });
+    await activitySignupsCollection.insertOne({ activityId, phone: req.phone, signedUpAt: new Date().toISOString(), checkins: [], tasks: [], coinsEarned: 0 });
+    await activitiesCollection.updateOne({ id: activityId }, { $inc: { participants: 1 } });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/activity/my', auth, async (req, res) => {
+  try {
+    const signups = await activitySignupsCollection.find({ phone: req.phone }).toArray();
+    const ids = signups.map(function(s){ return s.activityId; });
+    const acts = ids.length > 0 ? await activitiesCollection.find({ id: { $in: ids } }).toArray() : [];
+    var result = [];
+    acts.forEach(function(a){
+      var s = signups.find(function(x){ return x.activityId === a.id; });
+      if(s) result.push({ activity: a, signup: s });
+    });
+    res.json({ data: result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/activity/checkin', auth, async (req, res) => {
+  try {
+    const { activityId } = req.body;
+    if (!activityId) return res.status(400).json({ error: '缺少活动ID' });
+    const today = new Date().toISOString().slice(0,10);
+    var signup = await activitySignupsCollection.findOne({ activityId, phone: req.phone });
+    if (!signup) return res.status(400).json({ error: '未报名' });
+    if (signup.checkins && signup.checkins.includes(today)) return res.json({ ok: true, message: '今日已打卡' });
+    const activity = await activitiesCollection.findOne({ id: activityId });
+    var reward = (activity && activity.checkinReward) || 5;
+    await activitySignupsCollection.updateOne({ _id: signup._id }, { $push: { checkins: today }, $inc: { coinsEarned: reward } });
+    await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: reward } });
+    res.json({ ok: true, message: '打卡成功 +' + reward + ' 健康币', reward: reward });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/activity/task', auth, async (req, res) => {
+  try {
+    const { activityId } = req.body;
+    if (!activityId) return res.status(400).json({ error: '缺少活动ID' });
+    const today = new Date().toISOString().slice(0,10);
+    var signup = await activitySignupsCollection.findOne({ activityId, phone: req.phone });
+    if (!signup) return res.status(400).json({ error: '未报名' });
+    if (signup.tasks && signup.tasks.includes(today)) return res.json({ ok: true, message: '今日任务已完成' });
+    const activity = await activitiesCollection.findOne({ id: activityId });
+    var reward = (activity && activity.taskReward) || 10;
+    await activitySignupsCollection.updateOne({ _id: signup._id }, { $push: { tasks: today }, $inc: { coinsEarned: reward } });
+    await usersCollection.updateOne({ phone: req.phone }, { $inc: { coins: reward } });
+    res.json({ ok: true, message: '任务完成 +' + reward + ' 健康币', reward: reward });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
