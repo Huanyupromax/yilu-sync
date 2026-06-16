@@ -54,6 +54,7 @@ function sidebarHtml(current) {
     {key:'services',icon:'💳',label:'付费管理'},
     {key:'coins',icon:'🪙',label:'健康币管理'},
     {key:'activities',icon:'👨‍👩‍👧‍👦',label:'亲子活动'},
+    {key:'volunteer',icon:'🤝',label:'志愿报名'},
     {key:'data',icon:'📈',label:'健康数据'}
   ];
   var nav = items.map(function(i){
