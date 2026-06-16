@@ -474,7 +474,8 @@ window.addEventListener('hashchange', function() {
       adminUser = saved;
       navigate('dashboard');
     } else {
-      navigate('login');
+      var app = document.getElementById('admin-app');
+      if (app && pages.login) pages.login(app, {});
     }
     return;
   }
