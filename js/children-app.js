@@ -1926,6 +1926,57 @@ PAGES.activity = (app, params) => {
   };
 };
 
+
+PAGES.volunteer = (app) => {
+  setNavTitle('\u5FD7\u613F\u8005\u7533\u8BF7');
+  app.innerHTML = '<div class="container">'+
+    '<div class="card"><div class="card-title">\u53EF\u62A5\u540D\u7684\u5FD7\u613F\u6D3B\u52A8</div><div id="vol-opps"><div class="text-muted" style="text-align:center;padding:12px;">\u52A0\u8F7D\u4E2D...</div></div></div>'+
+    '<div class="card"><div class="card-title">\u6211\u7684\u5FD7\u613F\u8BB0\u5F55</div><div id="vol-mine"><div class="text-muted" style="text-align:center;padding:12px;">\u52A0\u8F7D\u4E2D...</div></div></div></div>';
+  
+  // Load available opportunities
+  fetch(API_BASE + '/api/volunteer/list').then(function(r){return r.json();}).then(function(d){
+    var el = document.getElementById('vol-opps');
+    if(!el) return;
+    if(!d.data || !d.data.length){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;font-size:13px;">\u6682\u65E0\u5FD7\u613F\u6D3B\u52A8</div>'; return; }
+    var h = '';
+    d.data.forEach(function(v){
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f1f2;">' +
+        '<div><div style="font-weight:600;font-size:14px;">' + escapeHtml(v.title) + '</div>' +
+        '<div style="font-size:12px;color:#999;">' + (v.location||'') + ' | ' + (v.date||'') + ' ' + (v.time||'') + '</div>' +
+        '<div style="font-size:12px;color:#999;">' + (v.description||'') + '</div>' +
+        '<div style="font-size:12px;color:var(--green);">\u6BCF\u5C0F\u65F6 ' + v.rewardPerHour + ' \u5065\u5EB7\u5E01</div></div>' +
+        '<button class="btn btn-primary" style="padding:6px 12px;font-size:13px;white-space:nowrap;" onclick="applyVolunteer(\'' + v.id + '\')">\u62A5\u540D</button></div>';
+    });
+    el.innerHTML = h;
+  });
+  
+  // Load my applications
+  if(currentUser){
+    fetch(API_BASE + '/api/volunteer/my', { headers: { Authorization: 'Bearer ' + currentUser.token } }).then(function(r){return r.json();}).then(function(d){
+      var el = document.getElementById('vol-mine');
+      if(!el) return;
+      if(!d.data || !d.data.length){ el.innerHTML = '<div class="text-muted" style="text-align:center;padding:12px;font-size:13px;">\u5C1A\u672A\u62A5\u540D\u5FD7\u613F\u6D3B\u52A8</div>'; return; }
+      var h = '';
+      d.data.forEach(function(item){
+        var v = item.volunteer;
+        var a = item.app;
+        if(!v) return;
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f1f2;">' +
+          '<div><div style="font-size:14px;font-weight:600;">' + escapeHtml(v.title) + '</div>' +
+          '<div style="font-size:12px;color:#999;">' + (v.location||'') + ' | ' + (v.date||'') + ' ' + (v.time||'') + '</div></div>' +
+          '<div style="font-size:13px;font-weight:600;color:var(--orange);">' + (a.coinsEarned||0) + ' \u5E01</div></div>';
+      });
+      el.innerHTML = h;
+    });
+  }
+};
+window.applyVolunteer = async function(id) {
+  if(!currentUser){ toast('\u8BF7\u5148\u767B\u5F55'); return; }
+  var res = await fetch(API_BASE + '/api/volunteer/apply', { method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token}, body:JSON.stringify({volunteerId:id}) });
+  var d = await res.json();
+  if(d.ok){ toast('\u62A5\u540D\u6210\u529F'); navigate('volunteer'); }else{ toast(d.error||'\u62A5\u540D\u5931\u8D25'); }
+};
+
 PAGES.myrx = (app) => {
   setNavTitle("我的运动处方");
   app.innerHTML = '<div class="container"><div id="rx-content"><div class="chart-placeholder">加载中...</div></div></div>';
