@@ -448,19 +448,127 @@ PAGES.sport = (app) => {
 };
 
 PAGES.data = (app) => {
-  const recCount = Object.keys(storage.getDailyRecords()).length;
-  app.innerHTML = '<div class="container">'+
-    '<div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">健康数据</div><div class="header-subtitle">已记录 '+recCount+' 天</div></div></div>'+
-    '<div class="data-entry-tile" data-go="data-entry"><div class="dt-ic">📝</div><div class="dt-info"><div class="dt-name">录入当日数据</div><div class="dt-desc">血压 · 心率 · 步数 · 睡眠</div></div><div class="dt-arrow">›</div></div>'+
-    '<div class="data-entry-tile green" data-go="data-summary"><div class="dt-ic">📊</div><div class="dt-info"><div class="dt-name">周/月数据总结</div><div class="dt-desc">一周与一个月的趋势汇总</div></div><div class="dt-arrow">›</div></div>'+
-    '<div class="data-entry-tile orange" data-go="doctor-patient-data"><div class="dt-ic">👥</div><div class="dt-info"><div class="dt-name">查看用户数据</div><div class="dt-desc">查看老年用户的运动健康数据</div></div><div class="dt-arrow">›</div></div>'+
-    '<div class="data-entry-tile orange" data-go="doctor-send-prescription" style="margin-top:4px;"><div class="dt-ic">📋</div><div class="dt-info"><div class="dt-name">发送运动处方</div><div class="dt-desc">为老年用户制定并发送运动处方</div></div><div class="dt-arrow">›</div></div>'+
-    '</div>';
-  app.querySelector('[data-go="data-entry"]').onclick = () => navigate('data-entry');
-  app.querySelector('[data-go="data-summary"]').onclick = () => navigate('data-summary');
-  app.querySelector('[data-go="doctor-patient-data"]').onclick = () => navigate('doctor-patient-data');
-  app.querySelector('[data-go="doctor-send-prescription"]').onclick = () => navigate('doctor-send-prescription');
+    setNavTitle('数据看板');
+    app.innerHTML = `
+        <div class="container">
+            <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">数据看板</div><div class="header-subtitle">多维度健康数据趋势分析</div></div></div>
+            <div class="card"><div class="card-title">选择患者</div>
+                <div class="form-row"><input id="trend-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="trend-search-btn" style="padding:6px 12px;">搜索</button></div>
+            </div>
+            <div id="trend-period-bar" style="display:none;" class="tab-bar" style="margin-bottom:8px;">
+                <button class="btn btn-sm" data-period="day" style="flex:1;">日</button>
+                <button class="btn btn-sm btn-primary" data-period="week" style="flex:1;">周</button>
+                <button class="btn btn-sm" data-period="month" style="flex:1;">月</button>
+                <button class="btn btn-sm" data-period="quarter" style="flex:1;">季度</button>
+            </div>
+            <div id="trend-content"></div>
+            <div id="report-section" style="display:none;">
+                <div class="card"><div class="card-title">康复报告</div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-primary" id="gen-month-report" style="flex:1;">生成月度报告</button>
+                        <button class="btn btn-secondary" id="gen-quarter-report" style="flex:1;">生成季度报告</button>
+                    </div>
+                    <div id="report-content" style="margin-top:8px;"></div>
+                </div>
+            </div>
+        </div>`;
+    var currentPhone = '';
+    app.querySelector('#trend-search-btn').onclick = function(){ loadTrends(app); };
+    app.querySelector('#trend-phone').onkeypress = function(e){ if(e.key==='Enter') loadTrends(app); };
+    app.querySelector('#gen-month-report').onclick = function(){ generateReport(app, currentPhone, 'month'); };
+    app.querySelector('#gen-quarter-report').onclick = function(){ generateReport(app, currentPhone, 'quarter'); };
 };
+
+function loadTrends(app) {
+    var phone = app.querySelector('#trend-phone').value.trim();
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    var period = 'week';
+    var activeBtn = app.querySelector('#trend-period-bar .btn-primary');
+    if(activeBtn) period = activeBtn.getAttribute('data-period') || 'week';
+    currentPhone = phone;
+    app.querySelector('#trend-period-bar').style.display = 'flex';
+    app.querySelector('#report-section').style.display = 'block';
+    app.querySelector('#trend-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;">加载中...</div>';
+    // Setup period buttons
+    app.querySelectorAll('#trend-period-bar .btn').forEach(function(btn){
+        btn.onclick = function(){
+            app.querySelectorAll('#trend-period-bar .btn').forEach(function(b){ b.className = 'btn btn-sm'; });
+            this.className = 'btn btn-sm btn-primary';
+            loadTrends(app);
+        };
+    });
+    fetch(API_BASE+'/api/doctor/patient-trends/'+encodeURIComponent(phone)+'?period='+period, {headers:{Authorization:'Bearer '+currentUser.token}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if(d.trends && d.trends.dates && d.trends.dates.length){
+                renderTrendChart(app, '心率 (次/分)', d.trends.dates, d.trends.heartRate, '#ff6b35', 50, 120);
+                renderTrendChart(app, '血糖 (mmol/L)', d.trends.dates, d.trends.bloodSugar, '#22c55e', 3, 10);
+                renderTrendChart(app, '步数', d.trends.dates, d.trends.steps, '#3b82f6', 0, 10000);
+                renderTrendChart(app, '睡眠 (小时)', d.trends.dates, d.trends.sleepHours, '#8b5cf6', 0, 12);
+            } else {
+                app.querySelector('#trend-content').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">📊</div><div class="text-muted">该患者暂无健康数据</div></div>';
+            }
+        })
+        .catch(function(){ app.querySelector('#trend-content').innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">加载失败</div>'; });
+}
+
+function renderTrendChart(app, label, dates, values, color, min, max) {
+    var container = app.querySelector('#trend-content');
+    var maxVal = max || Math.max.apply(null, values.filter(function(v){return v!==null;})) || 100;
+    var minVal = min || 0;
+    var range = maxVal - minVal || 1;
+    var bars = values.map(function(v,i){
+        if(v === null) return '<div style="width:'+(100/values.length-2)+'%;height:2px;background:#eee;border-radius:2px;margin:0 1px;align-self:flex-end;"></div>';
+        var h = Math.max(3, ((v-minVal)/range)*100);
+        var dateLabel = dates[i] ? dates[i].slice(5) : '';
+        return '<div style="display:flex;flex-direction:column;align-items:center;width:'+(100/values.length-1)+'%;"><div style="width:80%;height:'+h+'px;background:'+color+';border-radius:4px 4px 0 0;transition:height 0.3s;min-height:3px;"></div><div style="font-size:10px;color:var(--gray);margin-top:2px;">'+dateLabel+'</div></div>';
+    }).join('');
+    var currentValue = values[values.length-1];
+    var valueText = currentValue !== null && currentValue !== undefined ? currentValue : '--';
+    container.insertAdjacentHTML('beforeend',
+        '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div><div style="font-weight:600;font-size:15px;">'+label+'</div></div><div style="font-size:24px;font-weight:700;color:'+color+';">'+valueText+'</div></div><div style="display:flex;align-items:flex-end;height:120px;padding:4px 0;">'+bars+'</div></div>'
+    );
+}
+
+async function generateReport(app, phone, period) {
+    if(!phone){ toast('请先搜索患者'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    var container = app.querySelector('#report-content');
+    container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">生成中...</div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/generate-report', {
+            method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+            body:JSON.stringify({phone:phone, period:period})
+        });
+        var d = await res.json();
+        if(d.ok && d.report){
+            var r = d.report;
+            var title = period === 'month' ? '月度康复报告' : '季度康复报告';
+            container.innerHTML = '<div style="border:1px solid var(--orange-light);border-radius:12px;padding:12px;margin-top:8px;">' +
+                '<div style="font-weight:600;font-size:16px;margin-bottom:8px;">'+title+'</div>' +
+                '<div style="font-size:13px;color:var(--gray);margin-bottom:8px;">'+(r.startDate||'')+' ~ '+(r.endDate||'')+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>📊 健康指标总结</strong><br>'+escapeHtml(r.summary)+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>⚠️ 存在问题</strong><br>'+escapeHtml(r.problems)+'</div>' +
+                '<div style="margin-bottom:8px;"><strong>📋 下一步康复计划</strong><br>'+escapeHtml(r.nextPlan).replace(/\n/g,'<br>')+'</div>' +
+                '<button class="btn btn-primary btn-block" id="send-report-btn" style="margin-top:8px;">📤 发送报告给患者</button></div>';
+            app.querySelector('#send-report-btn').onclick = async function(){
+                try {
+                    var sr = await fetch(API_BASE+'/api/doctor/send-report', {
+                        method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+                        body:JSON.stringify({patientPhone:phone, report:r})
+                    });
+                    var sd = await sr.json();
+                    if(sd.ok) toast('报告已通过消息发送给患者'); else toast(sd.error||'发送失败');
+                } catch(e){ toast('网络错误'); }
+            };
+        } else {
+            container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">'+(d.error||'生成失败')+'</div>';
+        }
+    } catch(e){
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">生成失败</div>';
+    }
+}
 
 
 PAGES['doctor-patient-data'] = (app, params) => {

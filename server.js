@@ -1059,6 +1059,111 @@ app.get('/api/doctor/patient-records/:phone', auth, async (req, res) => {
     res.json({ data: records });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 患者数据趋势 ──
+app.get('/api/doctor/patient-trends/:phone', auth, async (req, res) => {
+  try {
+    const patient = await usersCollection.findOne({ phone: req.params.phone });
+    if (!patient) return res.status(404).json({ error: '未找到患者' });
+    const records = patient.data?.dailyRecords || {};
+    const period = req.query.period || 'week';
+    const today = new Date();
+    var start = new Date(today);
+    if (period === 'day') start.setDate(start.getDate() - 1);
+    else if (period === 'week') start.setDate(start.getDate() - 7);
+    else if (period === 'month') start.setMonth(start.getMonth() - 1);
+    else if (period === 'quarter') start.setMonth(start.getMonth() - 3);
+    const startStr = start.toISOString().slice(0,10);
+    const endStr = today.toISOString().slice(0,10);
+    var result = {};
+    Object.keys(records).forEach(function(date){
+      if (date >= startStr && date <= endStr) result[date] = records[date];
+    });
+    var dates = Object.keys(result).sort();
+    var trends = { dates: dates, heartRate: [], bloodPressure: [], bloodSugar: [], steps: [], sleepHours: [], bloodOxygen: [], bodyFat: [], exerciseMinutes: [] };
+    dates.forEach(function(d){
+      var r = result[d] || {};
+      trends.heartRate.push(r.heartRate || null);
+      trends.bloodPressure.push(r.bloodPressure || null);
+      trends.bloodSugar.push(r.bloodSugar || null);
+      trends.steps.push(r.steps || null);
+      trends.sleepHours.push(r.sleepHours || null);
+      trends.bloodOxygen.push(r.bloodOxygen || null);
+      trends.bodyFat.push(r.bodyFat || null);
+      trends.exerciseMinutes.push(r.exerciseMinutes || null);
+    });
+    res.json({ data: result, trends: trends, period: period, startDate: startStr, endDate: endStr });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 康复报告生成 ──
+app.post('/api/doctor/generate-report', auth, async (req, res) => {
+  try {
+    const { phone, period } = req.body;
+    if (!phone || !period) return res.status(400).json({ error: '缺少参数' });
+    const patient = await usersCollection.findOne({ phone });
+    if (!patient) return res.status(404).json({ error: '未找到患者' });
+    const records = patient.data?.dailyRecords || {};
+    const profile = patient.data?.profile || {};
+    const today = new Date();
+    var start = new Date(today);
+    if (period === 'month') start.setMonth(start.getMonth() - 1);
+    else if (period === 'quarter') start.setMonth(start.getMonth() - 3);
+    const startStr = start.toISOString().slice(0,10);
+    const endStr = today.toISOString().slice(0,10);
+    var vals = []; var bpSis = []; var steps = []; var sleeps = []; var hrs = [];
+    Object.keys(records).forEach(function(date){
+      if (date >= startStr && date <= endStr) {
+        var r = records[date];
+        if(r.bloodSugar) vals.push(parseFloat(r.bloodSugar));
+        if(r.bloodPressure) bpSis.push(parseInt((r.bloodPressure+'/').split('/')[0]));
+        if(r.steps) steps.push(parseInt(r.steps));
+        if(r.sleepHours) sleeps.push(parseFloat(r.sleepHours));
+        if(r.heartRate) hrs.push(parseInt(r.heartRate));
+      }
+    });
+    var avg = function(arr){ return arr.length ? Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length*10)/10 : 0; };
+    var report = {
+      patientName: profile.name || phone, patientPhone: phone,
+      period: period, startDate: startStr, endDate: endStr,
+      generatedAt: today.toISOString(),
+      stats: {
+        heartRate: { avg: avg(hrs), min: Math.min.apply(null,hrs)||0, max: Math.max.apply(null,hrs)||0, days: hrs.length },
+        bloodSugar: { avg: avg(vals), min: Math.min.apply(null,vals)||0, max: Math.max.apply(null,vals)||0, days: vals.length },
+        bloodPressure: { avgSys: avg(bpSis), days: bpSis.length },
+        steps: { avg: avg(steps), total: steps.reduce(function(a,b){return a+b;},0), days: steps.length },
+        sleep: { avg: avg(sleeps), days: sleeps.length }
+      },
+      summary: '',
+      problems: '',
+      nextPlan: ''
+    };
+    var healthLevel = report.stats.heartRate.avg >= 60 && report.stats.heartRate.avg <= 80 ? '良好' :
+      report.stats.heartRate.avg > 0 ? '一般' : '无数据';
+    report.summary = '本周期内共记录健康数据 '+Math.max(hrs.length,vals.length,bpSis.length)+' 天。'+
+      '平均心率 '+(report.stats.heartRate.avg||'--')+' 次/分，'+
+      '平均血糖 '+(report.stats.bloodSugar.avg||'--')+' mmol/L，'+
+      '平均步数 '+(report.stats.steps.avg||'--')+' 步，'+
+      '平均睡眠 '+(report.stats.sleep.avg||'--')+' 小时。整体健康等级为「'+healthLevel+'」。';
+    report.problems = hrs.length && report.stats.heartRate.avg > 80 ? '心率偏高，建议适当降低运动强度。' : '';
+    if(vals.length && report.stats.bloodSugar.avg > 6.1) report.problems += '血糖偏高，建议控制饮食并加强运动。';
+    if(!report.problems) report.problems = '各项指标基本正常，请继续保持。';
+    report.nextPlan = '1. 继续保持规律运动\n2. 定期监测健康数据\n3. 按时完成运动处方\n4. 如有不适及时就医';
+    res.json({ ok: true, report: report });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 发送康复报告 ──
+app.post('/api/doctor/send-report', auth, async (req, res) => {
+  try {
+    const { patientPhone, report } = req.body;
+    if (!patientPhone || !report) return res.status(400).json({ error: '缺少参数' });
+    var summary = '【康复报告】'+report.patientName+' '+(report.period==='month'?'月度':'季度')+'康复报告：'+report.summary.slice(0,50)+'...';
+    // Send to patient
+    await messagesCollection.insertOne({ from: req.phone, to: patientPhone, text: summary, timestamp: new Date().toISOString(), read: false });
+    res.json({ ok: true, message: '报告已发送' });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
