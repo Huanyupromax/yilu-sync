@@ -558,10 +558,10 @@ async function loadDashData(app) {
                 for(var key in names){
                     var vals = data.trends[key];
                     if(!vals || vals.every(function(v){return v===null;})) continue;
-                    var maxVal = maxVals[key] || Math.max.apply(null, vals.filter(function(v){return v!==null;})) || 100;
+                    var maxVal = Math.max(maxVals[key] || 0, Math.max.apply(null, vals.filter(function(v){return v!==null;})) || 100) || 100;
                     var bars = vals.map(function(v,i){
                         if(v === null) return '<div style="width:'+(100/vals.length-2)+'%;height:2px;background:#eee;border-radius:2px;margin:0 1px;align-self:flex-end;"></div>';
-                        var hh = Math.max(3, (v/maxVal)*100);
+                        var hh = Math.min(100, Math.max(3, (v/maxVal)*100));
                         var label = data.trends.dates[i] ? data.trends.dates[i].slice(5) : '';
                         return '<div style="display:flex;flex-direction:column;align-items:center;width:'+(100/vals.length-1)+'%;"><div style="width:80%;height:'+hh+'px;background:'+(colors[key]||'#666')+';border-radius:4px 4px 0 0;min-height:3px;"></div><div style="font-size:10px;color:var(--gray);margin-top:2px;">'+label+'</div></div>';
                     }).join('');
