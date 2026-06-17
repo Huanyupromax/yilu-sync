@@ -2269,14 +2269,14 @@ PAGES['ai-prescription'] = (app) => {
                 var rx = d.prescription;
                 var itemsHtml = (rx.items||[]).map(function(i){ return '<div class="prescription-box" style="border-color:var(--orange);background:var(--orange-light);margin-bottom:6px;"><div style="font-weight:600;">'+escapeHtml(i.icon)+' '+escapeHtml(i.name)+'</div><div style="font-size:14px;color:var(--gray);">'+escapeHtml(i.detail)+'</div></div>'; }).join('');
                 app.querySelector('#ai-prescription-content').innerHTML = `
-                    <div style="margin-bottom:8px;"><span class="badge" style="color:${rx.healthLevel==='良好'?'green':rx.healthLevel==='一般'?'orange':'red'};">健康等级: ${rx.healthLevel} (${rx.healthScore}分)</span></div>
+                    <div style="margin-bottom:8px;"><span class="badge" style="color:${rx.healthLevel==='良好'?'green':rx.healthLevel==='一般'?'orange':'red'};">健康等级: ${rx.healthLevel} (${rx.healthScore}分)</span></div>${rx.hasMedicalHistory ? '<span class="badge" style="color:var(--orange);margin-left:4px;">📋 已参考病史</span>' : ''}
                     <div style="margin-bottom:8px;"><strong>限制心率:</strong> ≤ ${rx.maxHeartRate} 次/分</div>
                     <div style="margin-bottom:8px;"><strong>频率:</strong> ${rx.frequency} | <strong>时长:</strong> ${rx.duration}</div>
                     <div style="margin-bottom:8px;"><strong>强度:</strong> ${rx.intensity}</div>
                     <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
                     ${itemsHtml}
                     <hr style="border:none;border-top:1px solid #f0f0f0;margin:8px 0;">
-                    <div style="margin-bottom:8px;"><strong>注意事项:</strong> ${escapeHtml(rx.cautions)}</div>
+                    <div style="margin-bottom:8px;"><strong>注意事项:</strong> ${escapeHtml(rx.cautions)}</div>${rx.medicalHistoryWarnings ? '<div style="margin:6px 0;padding:6px;background:#fff8f0;border-radius:6px;border:1px solid var(--orange);font-size:13px;"><strong>📋 已参考患者病史:</strong> '+escapeHtml(rx.medicalHistoryWarnings)+'</div>' : ''}
                     <div><strong>营养建议:</strong> ${escapeHtml(rx.dietAdvice)}</div>`;
                 app.querySelector('#ai-result').style.display = 'block';
                 toast('处方生成成功');

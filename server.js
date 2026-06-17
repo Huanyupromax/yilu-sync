@@ -1024,14 +1024,22 @@ app.post('/api/doctor/generate-prescription', auth, async (req, res) => {
     const freq = level==='良好'?'每周5-6次':level==='一般'?'每周3-4次':'每周2-3次';
     const dur = level==='良好'?'30-45分钟/次':level==='一般'?'20-30分钟/次':'10-15分钟/次';
     const cautions = hasChronic?'注意监测心率，不超过'+targetHR+'次/分。如有不适应立即停止。':'运动前热身5分钟，运动后拉伸。循序渐进，量力而行。';
-    res.json({ ok: true, prescription: {
+        var medHistRec = await medicalHistoriesCollection.findOne({ from: patientPhone, to: req.phone });
+    var histWarnStr = '';
+    if(medHistRec && medHistRec.healthInfo){
+      if(medHistRec.healthInfo.chronicDiseases) histWarnStr += '慢性病史：'+medHistRec.healthInfo.chronicDiseases+'。';
+      if(medHistRec.healthInfo.allergies) histWarnStr += '过敏史：'+medHistRec.healthInfo.allergies+'。';
+      if(medHistRec.healthInfo.medicationHistory) histWarnStr += '用药情况：'+medHistRec.healthInfo.medicationHistory+'。';
+    }
+res.json({ ok: true, prescription: {
       doctor: profile.name || '医师', hospital: '平台医师', date: today,
       age, hasChronic, bmi: Math.round(bmi*10)/10,
       healthScore: score, healthLevel: level,
       maxHeartRate: targetHR,
       intensity: level==='良好'?'中等强度':level==='一般'?'低强度':'极低强度',
       items: exercises, frequency: freq, duration: dur,
-      cautions, dietAdvice: '均衡饮食，多摄入蛋白质和膳食纤维'
+      cautions: finalCautions, dietAdvice: '均衡饮食，多摄入蛋白质和膳食纤维',
+      hasMedicalHistory: !!medHistRec, medicalHistoryWarnings: histWarnStr
     }});
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
