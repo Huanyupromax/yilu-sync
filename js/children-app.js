@@ -684,6 +684,7 @@ PAGES.messages = (app) => {
     app.querySelector('#assistant-btn').onclick = () => navigate('assistant');
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
         loadReports(app);
+    setInterval(function(){ loadReports(app); }, 30000);
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
     // Load friend requests and friends
@@ -1682,7 +1683,7 @@ PAGES.me = (app) => {
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
     // Load bound elderly from server
-  if(currentUser && !localStorage.getItem('boundElderlyPhone')){
+  if(currentUser){
     fetch(API_BASE+'/api/bind/elderly',{headers:{Authorization:'Bearer '+currentUser.token}}).then(function(r){return r.json();}).then(function(d){
       if(d.ok && d.phone) localStorage.setItem('boundElderlyPhone', d.phone);
     });

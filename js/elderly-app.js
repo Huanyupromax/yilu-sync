@@ -539,6 +539,7 @@ PAGES.messages = (app) => {
     app.querySelector('#assistant-btn').onclick = () => navigate('assistant');
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
         loadReports(app);
+    setInterval(function(){ loadReports(app); }, 30000);
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
     // Load friend requests and friends
