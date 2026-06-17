@@ -50,6 +50,8 @@ async function connectDB() {
     volunteerCollection = db.collection('volunteer');
     volunteerAppCollection = db.collection('volunteer_apps');
     qualificationsCollection = db.collection('qualifications');
+    medicalHistoriesCollection = db.collection('medical_histories');
+    withdrawalsCollection = db.collection('withdrawals');
     withdrawalsCollection = db.collection('withdrawals');
     await usersCollection.createIndex({ phone: 1 }, { unique: true });
     await groupsCollection.createIndex({ members: 1 });
@@ -1213,6 +1215,27 @@ app.get('/api/admin/live-data', adminAuth, async (req, res) => {
     });
     res.json({ data: result });
   } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 病史管理 ──
+app.post('/api/medical-history/send', auth, async (req, res) => {
+  try {
+    const { to, basicInfo, healthInfo, medicalReports, exerciseRecords, nutritionData } = req.body;
+    if (!to) return res.status(400).json({ error: '缺少接收医师手机号' });
+    const doctor = await usersCollection.findOne({ phone: to });
+    if (!doctor || doctor.role !== '医生与营养师') return res.status(400).json({ error: '该手机号不是医师端用户' });
+    const user = await usersCollection.findOne({ phone: req.phone });
+    const profile = user?.data?.profile || {};
+    const record = { id: 'mh_' + Date.now(), from: req.phone, to, patientName: profile.name || '', basicInfo: basicInfo || {}, healthInfo: healthInfo || {}, medicalReports: medicalReports || '', exerciseRecords: exerciseRecords || '', nutritionData: nutritionData || '', sentAt: new Date().toISOString() };
+    await medicalHistoriesCollection.insertOne(record);
+    res.json({ ok: true, id: record.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.get('/api/medical-history/received', auth, async (req, res) => {
+  try {
+    const records = await medicalHistoriesCollection.find({ to: req.phone }).sort({ sentAt: -1 }).toArray();
+    res.json({ data: records });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
