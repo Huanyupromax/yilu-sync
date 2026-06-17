@@ -462,12 +462,20 @@ PAGES.data = (app) => {
             <div class="card"><div class="card-title">选择患者</div>
                 <div class="form-row"><input id="dash-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="dash-search-btn" style="padding:6px 12px;">搜索</button></div>
             </div>
+            <div id="dash-period-bar" style="display:none;margin-bottom:4px;">
+                <div style="display:flex;gap:4px;margin-bottom:4px;">
+                    <button class="btn btn-sm btn-primary" data-period="day" style="flex:1;">今日</button>
+                    <button class="btn btn-sm" data-period="week" style="flex:1;">本周</button>
+                    <button class="btn btn-sm" data-period="month" style="flex:1;">本月</button>
+                    <button class="btn btn-sm" data-period="quarter" style="flex:1;">季度</button>
+                </div>
+            </div>
             <div id="dash-refresh-bar" style="display:none;text-align:right;font-size:12px;color:var(--gray);margin-bottom:4px;">
                 <span id="dash-update-time">—</span>
                 <button class="btn btn-ghost" id="dash-refresh-btn" style="padding:2px 6px;font-size:11px;">🔄 刷新</button>
             </div>
             <div id="dash-content"></div>
-        </div>`;
+        </div>`
     app.querySelector('#dash-search-btn').onclick = function(){ loadDashData(app); };
     app.querySelector('#dash-phone').onkeypress = function(e){ if(e.key==='Enter') loadDashData(app); };
     app.querySelector('#dash-refresh-btn').onclick = function(){ if(app.querySelector('#dash-phone').value.trim()) loadDashData(app); };
@@ -479,41 +487,94 @@ async function loadDashData(app) {
     var phone = app.querySelector('#dash-phone').value.trim();
     if(!phone){ toast('请输入手机号'); return; }
     if(!currentUser){ toast('请先登录'); return; }
-    app.querySelector('#dash-content').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">查询中...</div>';
-    try {
-        var res = await fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
-        var d = await res.json();
-        if(!d.patient){
-            app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">👤</div><div class="text-muted">未找到该患者</div></div>'; return;
-        }
-        var records = d.dailyRecords || {};
-        var today = new Date().toISOString().slice(0,10);
-        var h = records[today] || {};
-    // Normalize elderly端 field names
-    if(h.bp && !h.bloodPressure) h.bloodPressure = h.bp;
-    if(h.sleep && !h.sleepHours) h.sleepHours = h.sleep;
-        var name = d.patient.name || '未设置';
-        var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">👤</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(name)+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+' · 今日健康数据</div></div></div></div>';
-        html += '<div class="card" style="margin-bottom:8px;"><div class="card-title">📊 今日健康指标</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
-            '<div class="info-pill green"><div class="fs-28 fw-600">'+(h.heartRate||'—')+'</div><div style="font-size:12px;">心率 (次/分)</div></div>' +
-            '<div class="info-pill orange"><div class="fs-28 fw-600">'+(h.bloodPressure||'—')+'</div><div style="font-size:12px;">血压 (mmHg)</div></div>' +
-            '<div class="info-pill purple"><div class="fs-28 fw-600">'+(h.bloodOxygen||'—')+'</div><div style="font-size:12px;">血氧 (%)</div></div>' +
-            '<div class="info-pill blue"><div class="fs-28 fw-600">'+(h.bloodSugar||'—')+'</div><div style="font-size:12px;">血糖 (mmol/L)</div></div>' +
-            '<div class="info-pill" style="background:#fef3c7;"><div class="fs-28 fw-600">'+(h.steps||'—')+'</div><div style="font-size:12px;">步数</div></div>' +
-            '<div class="info-pill" style="background:#ede9fe;"><div class="fs-28 fw-600">'+(h.sleepHours||'—')+'</div><div style="font-size:12px;">睡眠 (小时)</div></div>' +
-            '</div></div>';
-        html += '<button class="btn btn-ghost btn-block" onclick="navigate(\'patient-records\')">📋 查看诊疗档案</button>';
-        app.querySelector('#dash-content').innerHTML = html;
-        var now = new Date();
-        app.querySelector('#dash-refresh-bar').style.display = 'block';
-        app.querySelector('#dash-update-time').textContent = '最近更新: '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
-        if(dashRefreshTimer) clearInterval(dashRefreshTimer);
-        dashRefreshTimer = setInterval(function(){
-            if(!document.getElementById('dash-phone')||!document.getElementById('dash-phone').value.trim()){ clearInterval(dashRefreshTimer); dashRefreshTimer = null; return; }
+    
+    // Get selected period
+    var activeBtn = app.querySelector('#dash-period-bar .btn-primary');
+    var period = activeBtn ? activeBtn.getAttribute('data-period') : 'day';
+    
+    // Setup period buttons
+    app.querySelector('#dash-period-bar').style.display = 'flex';
+    app.querySelectorAll('#dash-period-bar .btn').forEach(function(btn){
+        btn.onclick = function(){
+            app.querySelectorAll('#dash-period-bar .btn').forEach(function(b){ b.className = 'btn btn-sm'; });
+            this.className = 'btn btn-sm btn-primary';
             loadDashData(app);
-        }, 30000);
-    } catch(e){
-        app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">⚠️</div><div class="text-muted" style="color:var(--red);">加载失败，请检查网络</div></div>';
+        };
+    });
+    
+    app.querySelector('#dash-content').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">查询中...</div>';
+    
+    if (period === 'day') {
+        // Show today's health data
+        try {
+            var res = await fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
+            var d = await res.json();
+            if(!d.patient){
+                app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">\uD83D\uDC64</div><div class="text-muted">\u672A\u627E\u5230\u8BE5\u60A3\u8005</div></div>'; return;
+            }
+            var records = d.dailyRecords || {};
+            var today = new Date().toISOString().slice(0,10);
+            var h = records[today] || {};
+            // Normalize field names
+            if(h.bp && !h.bloodPressure) h.bloodPressure = h.bp;
+            if(h.sleep && !h.sleepHours) h.sleepHours = h.sleep;
+            var name = d.patient.name || '\u672A\u8BBE\u7F6E';
+            var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">\uD83D\uDC64</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(name)+'</div><div style="font-size:13px;color:var(--gray);">'+escapeHtml(phone)+' \u00B7 \u4ECA\u65E5\u5065\u5EB7\u6570\u636E</div></div></div></div>';
+            html += '<div class="card" style="margin-bottom:8px;"><div class="card-title">\uD83D\uDCCA \u4ECA\u65E5\u5065\u5EB7\u6307\u6807</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+                '<div class="info-pill green"><div class="fs-28 fw-600">'+(h.heartRate||'\u2014')+'</div><div style="font-size:12px;">\u5FC3\u7387 (\u6B21/\u5206)</div></div>' +
+                '<div class="info-pill orange"><div class="fs-28 fw-600">'+(h.bloodPressure||'\u2014')+'</div><div style="font-size:12px;">\u8840\u538B (mmHg)</div></div>' +
+                '<div class="info-pill purple"><div class="fs-28 fw-600">'+(h.bloodOxygen||'\u2014')+'</div><div style="font-size:12px;">\u8840\u6C27 (%)</div></div>' +
+                '<div class="info-pill blue"><div class="fs-28 fw-600">'+(h.bloodSugar||'\u2014')+'</div><div style="font-size:12px;">\u8840\u7CD6 (mmol/L)</div></div>' +
+                '<div class="info-pill" style="background:#fef3c7;"><div class="fs-28 fw-600">'+(h.steps||'\u2014')+'</div><div style="font-size:12px;">\u6B65\u6570</div></div>' +
+                '<div class="info-pill" style="background:#ede9fe;"><div class="fs-28 fw-600">'+(h.sleepHours||'\u2014')+'</div><div style="font-size:12px;">\u7761\u7720 (\u5C0F\u65F6)</div></div>' +
+                '</div></div>';
+            html += '<button class="btn btn-ghost btn-block" onclick="navigate(\'patient-records\')">\uD83D\uDCCB \u67E5\u770B\u8BCA\u7597\u6863\u6848</button>';
+            app.querySelector('#dash-content').innerHTML = html;
+            
+            // Update refresh time
+            app.querySelector('#dash-refresh-bar').style.display = 'block';
+            var now = new Date();
+            app.querySelector('#dash-update-time').textContent = '\u6700\u8FD1\u66F4\u65B0: '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+            if(dashRefreshTimer) clearInterval(dashRefreshTimer);
+            dashRefreshTimer = setInterval(function(){
+                if(!document.getElementById('dash-phone')||!document.getElementById('dash-phone').value.trim()){ clearInterval(dashRefreshTimer); dashRefreshTimer = null; return; }
+                loadDashData(app);
+            }, 30000);
+        } catch(e){
+            app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">\u26A0\uFE0F</div><div class="text-muted" style="color:var(--red);">\u52A0\u8F7D\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC</div></div>';
+        }
+    } else {
+        // Show trend charts for week/month/quarter
+        try {
+            var res = await fetch(API_BASE+'/api/doctor/patient-trends/'+encodeURIComponent(phone)+'?period='+period, {headers:{Authorization:'Bearer '+currentUser.token}});
+            var data = await res.json();
+            if(data.trends && data.trends.dates && data.trends.dates.length){
+                var periodLabels = {day:'今日',week:'本周',month:'本月',quarter:'本季度'};
+                var html = '<div class="card" style="margin-bottom:8px;"><div class="row"><div class="avatar orange" style="width:50px;height:50px;font-size:28px;">\uD83D\uDC64</div><div style="flex:1;"><div style="font-weight:600;font-size:18px;">'+escapeHtml(phone)+'</div><div style="font-size:13px;color:var(--gray);">'+(periodLabels[period]||'')+' \u8D8B\u52BF\u56FE</div></div></div></div>';
+                var names = {heartRate:'\u5FC3\u7387 (\u6B21/\u5206)', bloodSugar:'\u8840\u7CD6 (mmol/L)', steps:'\u6B65\u6570', sleepHours:'\u7761\u7720 (\u5C0F\u65F6)', bloodOxygen:'\u8840\u6C27 (%)', bloodPressure:'\u8840\u538B (mmHg)'};
+                var colors = {heartRate:'#ff6b35', bloodSugar:'#22c55e', steps:'#3b82f6', sleepHours:'#8b5cf6', bloodOxygen:'#06b6d4', bloodPressure:'#ef4444'};
+                var maxVals = {heartRate:120, bloodSugar:10, steps:10000, sleepHours:12, bloodOxygen:100, bloodPressure:160};
+                
+                for(var key in names){
+                    var vals = data.trends[key];
+                    if(!vals || vals.every(function(v){return v===null;})) continue;
+                    var maxVal = maxVals[key] || Math.max.apply(null, vals.filter(function(v){return v!==null;})) || 100;
+                    var bars = vals.map(function(v,i){
+                        if(v === null) return '<div style="width:'+(100/vals.length-2)+'%;height:2px;background:#eee;border-radius:2px;margin:0 1px;align-self:flex-end;"></div>';
+                        var hh = Math.max(3, (v/maxVal)*100);
+                        var label = data.trends.dates[i] ? data.trends.dates[i].slice(5) : '';
+                        return '<div style="display:flex;flex-direction:column;align-items:center;width:'+(100/vals.length-1)+'%;"><div style="width:80%;height:'+hh+'px;background:'+(colors[key]||'#666')+';border-radius:4px 4px 0 0;min-height:3px;"></div><div style="font-size:10px;color:var(--gray);margin-top:2px;">'+label+'</div></div>';
+                    }).join('');
+                    var lastVal = vals[vals.length-1];
+                    html += '<div class="card" style="margin-bottom:6px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:6px;margin-bottom:6px;"><div style="font-weight:600;font-size:14px;">'+(names[key]||key)+'</div><div style="font-size:20px;font-weight:700;color:'+(colors[key]||'#666')+';">'+(lastVal!==null&&lastVal!==undefined?lastVal:'--')+'</div></div><div style="display:flex;align-items:flex-end;height:100px;padding:4px 0;">'+bars+'</div></div>';
+                }
+                app.querySelector('#dash-content').innerHTML = html;
+            } else {
+                app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">\uD83D\uDCCA</div><div class="text-muted">\u8BE5\u60A3\u8005\u6682\u65E0\u8DB3\u591F\u6570\u636E</div></div>';
+            }
+        } catch(e){
+            app.querySelector('#dash-content').innerHTML = '<div class="card" style="padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:12px;">\u26A0\uFE0F</div><div class="text-muted" style="color:var(--red);">\u52A0\u8F7D\u5931\u8D25</div></div>';
+        }
     }
 }
 
