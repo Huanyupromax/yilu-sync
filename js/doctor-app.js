@@ -459,6 +459,7 @@ PAGES.data = (app) => {
     app.innerHTML = `
         <div class="container">
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">数据看板</div><div class="header-subtitle">查看患者的实时健康数据</div></div></div>
+            <div class="card" style="margin-bottom:8px;"><div class="row" style="align-items:center;"><div style="flex:1;"><div style="font-weight:600;">📋 阶段性康复报告</div><div style="font-size:13px;color:var(--gray);">自动生成月度/季度康复报告，一键发送给患者</div></div><button class="btn btn-primary" id="go-periodic-report" style="padding:6px 14px;white-space:nowrap;">生成报告</button></div></div>
             <div class="card"><div class="card-title">选择患者</div>
                 <div class="form-row"><input id="dash-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" /><button class="btn btn-primary" id="dash-search-btn" style="padding:6px 12px;">搜索</button></div>
             </div>
@@ -479,6 +480,7 @@ PAGES.data = (app) => {
     app.querySelector('#dash-search-btn').onclick = function(){ loadDashData(app); };
     app.querySelector('#dash-phone').onkeypress = function(e){ if(e.key==='Enter') loadDashData(app); };
     app.querySelector('#dash-refresh-btn').onclick = function(){ if(app.querySelector('#dash-phone').value.trim()) loadDashData(app); };
+    app.querySelector('#go-periodic-report').onclick = function(){ navigate('periodic-report'); };
 };
 
 var dashRefreshTimer = null;
@@ -2657,6 +2659,75 @@ async function loadPrescriptionAnalysis(app) {
     } catch(e){
         app.querySelector('#adjust-result').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div class="text-muted" style="color:var(--red);">分析失败<\/div><\/div>';
     }
+}
+PAGES['periodic-report'] = (app) => {
+    setNavTitle('阶段性康复报告');
+    app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">阶段性康复报告<\/div><div class="header-subtitle">自动生成并发送康复报告<\/div><\/div><\/div><div class="card"><div class="card-title">选择患者<\/div><div class="form-row"><input id="pr-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" \/><button class="btn btn-primary" id="pr-search-btn" style="padding:6px 12px;">搜索<\/button><\/div><div id="pr-patient-info"><\/div><\/div><div id="pr-form" style="display:none;"><div class="card"><div class="card-title">选择报告周期<\/div><button class="btn btn-primary" id="pr-month-btn" style="margin-right:8px;">生成月度报告<\/button><button class="btn btn-secondary" id="pr-quarter-btn">生成季度报告<\/button><\/div><div class="card" style="display:none;" id="pr-report-card"><div class="card-title">📋 报告内容<\/div><div id="pr-report-content"><\/div><button class="btn btn-primary btn-block" id="pr-send-btn" style="margin-top:8px;">📤 发送报告给患者<\/button><div id="pr-send-result"><\/div><\/div><\/div><\/div>';
+    var prPhone = ''; var prReport = null; var prPeriod = '';
+    app.querySelector('#pr-search-btn').onclick = function(){ prSearch(app); };
+    app.querySelector('#pr-phone').onkeypress = function(e){ if(e.key==='Enter') prSearch(app); };
+    app.querySelector('#pr-month-btn').onclick = function(){ prGenerate(app, 'month'); };
+    app.querySelector('#pr-quarter-btn').onclick = function(){ prGenerate(app, 'quarter'); };
+    app.querySelector('#pr-send-btn').onclick = function(){ prSend(app); };
+};
+
+async function prSearch(app) {
+    var phone = app.querySelector('#pr-phone').value.trim();
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    app.querySelector('#pr-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">查询中...<\/div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/patient-data?phone='+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.patient){
+            prPhone = phone;
+            app.querySelector('#pr-patient-info').innerHTML = '<div class="form-row" style="border:1px solid var(--green);border-radius:8px;padding:10px;margin-top:8px;"><span>✅<\/span><div style="flex:1;"><span style="font-weight:600;">'+escapeHtml(d.patient.name||'')+' ('+escapeHtml(phone)+')<\/span><\/div><\/div>';
+            app.querySelector('#pr-form').style.display = 'block';
+        } else {
+            app.querySelector('#pr-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该患者<\/div>';
+            app.querySelector('#pr-form').style.display = 'none';
+        }
+    } catch(e){ app.querySelector('#pr-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">查询失败<\/div>'; }
+}
+
+async function prGenerate(app, period) {
+    if(!prPhone){ toast('请先搜索患者'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    prPeriod = period;
+    document.getElementById('pr-report-card').style.display = 'none';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/generate-report', {
+            method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+            body:JSON.stringify({phone:prPhone, period:period})
+        });
+        var d = await res.json();
+        if(d.ok && d.report){
+            prReport = d.report;
+            var r = d.report;
+            var title = period === 'month' ? '月度康复报告' : '季度康复报告';
+            document.getElementById('pr-report-content').innerHTML = '<div style="margin-bottom:8px;"><strong>📊 健康指标总结</strong><br><span style="font-size:13px;">'+escapeHtml(r.summary||'')+'<\/span><\/div><div style="margin-bottom:8px;"><strong>⚠️ 存在问题</strong><br><span style="font-size:13px;">'+escapeHtml(r.problems||'')+'<\/span><\/div><div style="margin-bottom:8px;"><strong>📋 下一步康复计划</strong><br><span style="font-size:13px;">'+escapeHtml(r.nextPlan||'').replace(/\\n/g,'<br>')+'<\/span><\/div>';
+            document.getElementById('pr-report-card').style.display = 'block';
+            toast('报告生成成功');
+        } else { toast(d.error||'生成失败'); }
+    } catch(e){ toast('网络错误'); }
+}
+
+async function prSend(app) {
+    if(!prPhone || !prReport){ toast('请先生成报告'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    document.getElementById('pr-send-btn').textContent = '⏳ 发送中...';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/send-periodic-report', {
+            method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+            body:JSON.stringify({phone:prPhone, period:prPeriod, report:prReport})
+        });
+        var d = await res.json();
+        if(d.ok){
+            toast('报告已发送给患者'+(d.sentTo.length>1?'及子女端':'')+' ('+d.sentTo.length+'人)');
+            document.getElementById('pr-send-result').innerHTML = '<div style="color:green;text-align:center;padding:8px;">✅ 已发送至 '+d.sentTo.length+' 个账号<\/div>';
+        } else { toast(d.error||'发送失败'); }
+    } catch(e){ toast('网络错误'); }
+    document.getElementById('pr-send-btn').textContent = '📤 发送报告给患者';
 }// ========== 初始化 ==========
 
 // ── 付费服务页面 ──

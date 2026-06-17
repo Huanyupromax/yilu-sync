@@ -1329,6 +1329,25 @@ app.post('/api/doctor/prescription/update', auth, async (req, res) => {
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 发送阶段性康复报告 ──
+app.post('/api/doctor/send-periodic-report', auth, async (req, res) => {
+  try {
+    const { phone, period, report } = req.body;
+    if (!phone || !report) return res.status(400).json({ error: '缺少参数' });
+    var title = period === 'month' ? '【月度康复报告】' : '【季度康复报告】';
+    var msgText = title + '\n' + (report.patientName||'') + ' (' + phone + ')\n\n📊 健康指标总结:\n' + (report.summary||'') + '\n\n⚠️ 存在问题:\n' + (report.problems||'') + '\n\n📋 下一步康复计划:\n' + (report.nextPlan||'');
+    var now = new Date().toISOString();
+    await messagesCollection.insertOne({ from: req.phone, to: phone, text: msgText, timestamp: now, read: false });
+    var sentTo = [phone];
+    var children = await usersCollection.find({ 'data.boundElderly': phone }).toArray();
+    children.forEach(function(child){
+      messagesCollection.insertOne({ from: req.phone, to: child.phone, text: msgText, timestamp: now, read: false });
+      sentTo.push(child.phone);
+    });
+    res.json({ ok: true, sentTo: sentTo });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
