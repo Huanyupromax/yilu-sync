@@ -2573,7 +2573,7 @@ PAGES.settings = (app) => {
     '<div style="font-size:16px;margin-bottom:4px;">手机号: <strong>'+(currentUser?escapeHtml(currentUser.phone):"")+'</strong></div>'+
     '<div style="font-size:16px;margin-bottom:16px;">身份: <strong>'+(currentUser?escapeHtml(currentUser.role||"银龄用户"):"")+'</strong></div></div>'+
     '<div class="card"><div class="card-title" style="color:var(--red);">危险操作</div>'+
-    '<button class="btn btn-danger btn-block" id="delete-account-btn">\uD83D\DDD1\uFE0F 注销账户</button>'+
+    '<button class="btn btn-danger btn-block" id="delete-account-btn">\uD83D\uDDD1\uFE0F 注销账户</button>'+
     '<div style="font-size:12px;color:var(--gray);margin-top:8px;text-align:center;">注销后该手机号可重新注册，但所有数据将被永久删除</div></div></div>';
   document.getElementById("delete-account-btn").onclick = async function(){
     if(!currentUser){toast("请先登录");return;}
