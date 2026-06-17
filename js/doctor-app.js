@@ -2383,6 +2383,7 @@ PAGES['batch-reply'] = (app) => {
     setNavTitle('批量回复');
     app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">批量回复<\/div><div class="header-subtitle">选择多位患者，群发消息<\/div><\/div><\/div><div class="card"><div class="card-title">👥 选择患者（点击选中）<\/div><div id="batch-friends"><div class="text-muted" style="text-align:center;padding:16px;">加载好友列表...<\/div><\/div><\/div><div id="batch-msg-area" style="display:none;"><div class="card"><div class="card-title">📝 回复内容<\/div><textarea id="batch-msg" class="form-input" rows="3" placeholder="输入要群发的消息..."><\/textarea><\/div><button class="btn btn-primary btn-block" id="batch-send-btn">📨 发送给选中患者<\/button><div id="batch-result"><\/div><\/div><\/div>';
     loadBatchFriends(app);
+    document.getElementById('batch-send-btn').onclick = sendBatchReply;
 };
 async function loadBatchFriends(app) {
     if(!currentUser){ app.querySelector('#batch-friends').innerHTML='<div class="text-muted" style="text-align:center;padding:16px;">请先登录<\/div>'; return; }
@@ -2433,14 +2434,14 @@ window.sendBatchReply = async function(){
         else toast(d.error||'发送失败');
     } catch(e){ toast('网络错误'); }
     document.getElementById('batch-send-btn').textContent = '📨 发送给选中患者';
-};    document.getElementById('batch-send-btn').onclick = sendBatchReply;
+};
 
 PAGES['export-data'] = (app) => {
     setNavTitle('数据导出');
     app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">数据导出<\/div><div class="header-subtitle">导出患者健康数据<\/div><\/div><\/div><div class="card"><div class="card-title">选择患者<\/div><div class="form-row"><input id="export-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" \/><button class="btn btn-primary" id="export-search-btn" style="padding:6px 12px;">搜索<\/button><\/div><div id="export-patient-info"><\/div><\/div><div id="export-content" style="display:none;"><button class="btn btn-primary btn-block" id="export-all-btn">📥 导出全部数据<\/button><div id="export-result"><\/div><\/div><\/div>';
-    app.querySelector('#export-search-btn').onclick = function(){ loadExportData(app); };
-    app.querySelector('#export-phone').onkeypress = function(e){ if(e.key==='Enter') loadExportData(app); };
-    app.querySelector('#export-all-btn').onclick = function(){ showExportResult(app); };
+    var _sbtn = app.querySelector('#export-search-btn'); if(_sbtn) _sbtn.onclick = function(){ loadExportData(app); };
+    var _ephone = app.querySelector('#export-phone'); if(_ephone) _ephone.onkeypress = function(e){ if(e.key==='Enter') loadExportData(app); };
+    var _btn = app.querySelector('#export-all-btn'); if(_btn) _btn.onclick = function(){ showExportResult(app); };
     var exportDataCache = null;
 };
 async function loadExportData(app) {
