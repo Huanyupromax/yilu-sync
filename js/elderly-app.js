@@ -528,6 +528,7 @@ PAGES.messages = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">消息</div><div class="header-subtitle">${contacts.length} 位联系人</div></div><div class="header-add" id="add-contact-btn">＋</div></div>
             <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>🔍</span><input id="friend-search-input" class="form-input" placeholder="输入手机号搜索好友" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">搜索</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">👥</div><div><div class="t">群聊</div><div class="s">点击查看我的群聊</div></div></div>
             <div class="banner" id="assistant-btn"><div class="emoji">🤖</div><div><div class="t">安全助手</div><div class="s">智能健康顾问（支持语音）</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">🧠</div><div><div class="t">智能算法</div><div class="s">基于健康数据的营养运动建议</div></div></div>
+            <div class="card" id="report-card" style="margin-bottom:8px;display:none;"><div class="card-title">📋 康复报告</div><div id="report-list"></div></div>
             <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">📩 好友请求</div><div id="friend-requests-list"></div></div>
             <div class="card" id="friends-card" style="display:none;"><div class="card-title">👥 我的好友</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
             <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div></div>`).join('')}</div>
@@ -537,6 +538,7 @@ PAGES.messages = (app) => {
     app.querySelector('#group-list-btn').onclick = () => navigate('group-list');
     app.querySelector('#assistant-btn').onclick = () => navigate('assistant');
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
+        loadReports(app);
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
     // Load friend requests and friends
@@ -1729,6 +1731,42 @@ async function searchFriend() {
 
 
 PAGES['send-history'] = (app) => { setNavTitle('发送病史'); const p = storage.getProfile() || {}; app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">向医师发送病史<\/div><div class="header-subtitle">填写个人信息发送给您的医师<\/div><\/div><\/div><div class="card"><div class="card-title">📞 接收医师<\/div><div class="form-row"><input id="hist-doctor-phone" class="form-input" placeholder="输入医师手机号" style="flex:1;" \/><button class="btn btn-primary" id="hist-check-btn" style="padding:6px 12px;">验证<\/button><\/div><div id="hist-doctor-info"><\/div><\/div><div id="hist-form" style="display:none;"><div class="card"><div class="card-title">👤 基础信息<\/div><div class="form-group"><label>年龄<\/label><input id="hist-age" class="form-input" placeholder="如：65" \/><\/div><div class="form-group"><label>性别<\/label><select id="hist-gender" class="form-input"><option value="男">男<\/option><option value="女">女<\/option><\/select><\/div><div class="form-group"><label>职业<\/label><input id="hist-occupation" class="form-input" placeholder="如：退休" \/><\/div><div class="form-group"><label>收入水平<\/label><select id="hist-income" class="form-input"><option value="低">低<\/option><option value="中" selected>中<\/option><option value="高">高<\/option><\/select><\/div><\/div><div class="card"><div class="card-title">🏥 健康信息<\/div><div class="form-group"><label>慢病病史<\/label><textarea id="hist-chronic" class="form-input" rows="2" placeholder="如：高血压、糖尿病"><\/textarea><\/div><div class="form-group"><label>用药史<\/label><textarea id="hist-meds" class="form-input" rows="2" placeholder="正在服用的药物"><\/textarea><\/div><div class="form-group"><label>过敏史<\/label><textarea id="hist-allergy" class="form-input" rows="2" placeholder="药物或食物过敏情况"><\/textarea><\/div><div class="form-group"><label>既往手术史<\/label><textarea id="hist-surgery" class="form-input" rows="2" placeholder="曾做过的手术"><\/textarea><\/div><\/div><div class="card"><div class="card-title">📄 补充信息<\/div><div class="form-group"><label>体检报告摘要<\/label><textarea id="hist-reports" class="form-input" rows="2" placeholder="最近体检结果"><\/textarea><\/div><div class="form-group"><label>运动记录<\/label><textarea id="hist-exercise" class="form-input" rows="2" placeholder="运动习惯"><\/textarea><\/div><div class="form-group"><label>营养摄入数据<\/label><textarea id="hist-nutrition" class="form-input" rows="2" placeholder="饮食习惯"><\/textarea><\/div><\/div><button class="btn btn-primary btn-block" id="hist-send-btn">📤 发送病史给医师<\/button><div id="hist-send-result"><\/div><\/div><\/div>'; if(p.age) setTimeout(function(){ document.getElementById('hist-age').value = p.age; },100); if(p.gender) setTimeout(function(){ document.getElementById('hist-gender').value = p.gender; },100); var vd=''; document.getElementById('hist-check-btn').onclick=function(){ var phone=document.getElementById('hist-doctor-phone').value.trim(); if(!phone){toast('请输入医师手机号');return;} if(!currentUser){toast('请先登录');return;} document.getElementById('hist-doctor-info').innerHTML='<div class="text-muted" style="text-align:center;padding:8px;">验证中...<\/div>'; fetch(API_BASE+'/api/user/search?phone='+encodeURIComponent(phone),{headers:{Authorization:'Bearer '+currentUser.token}}).then(function(r){return r.json();}).then(function(d){if(d.user&&d.user.role==='医生与营养师'){vd=phone;document.getElementById('hist-doctor-info').innerHTML='<div style="border:1px solid var(--green);border-radius:8px;padding:8px;margin-top:4px;text-align:center;"><span style="color:green;font-weight:600;">✅ 已验证为医师端用户<\/span><\/div>';document.getElementById('hist-form').style.display='block';}else{vd='';document.getElementById('hist-doctor-info').innerHTML='<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">该手机号不是医师端用户，无法发送<\/div>';document.getElementById('hist-form').style.display='none';}}).catch(function(){document.getElementById('hist-doctor-info').innerHTML='<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">验证失败<\/div>';});}; document.getElementById('hist-send-btn').onclick=async function(){ if(!vd){toast('请先验证医师手机号');return;} if(!currentUser){toast('请先登录');return;} document.getElementById('hist-send-btn').textContent='⏳ 发送中...'; try{var res=await fetch(API_BASE+'/api/medical-history/send',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},body:JSON.stringify({to:vd,basicInfo:{age:document.getElementById('hist-age').value.trim(),gender:document.getElementById('hist-gender').value,occupation:document.getElementById('hist-occupation').value.trim(),incomeLevel:document.getElementById('hist-income').value},healthInfo:{chronicDiseases:document.getElementById('hist-chronic').value.trim(),medicationHistory:document.getElementById('hist-meds').value.trim(),allergies:document.getElementById('hist-allergy').value.trim(),surgeryHistory:document.getElementById('hist-surgery').value.trim()},medicalReports:document.getElementById('hist-reports').value.trim(),exerciseRecords:document.getElementById('hist-exercise').value.trim(),nutritionData:document.getElementById('hist-nutrition').value.trim()})});var d=await res.json();if(d.ok){toast('病史已发送给医师');document.getElementById('hist-send-result').innerHTML='<div style="color:green;text-align:center;padding:8px;">✅ 发送成功<\/div>';}else toast(d.error||'发送失败');}catch(e){toast('网络错误');}document.getElementById('hist-send-btn').textContent='📤 发送病史给医师';}; };
+
+
+
+// ── 加载康复报告 ──
+async function loadReports(app) {
+    if(!currentUser){ return; }
+    try {
+        var res = await fetch(API_BASE+'/api/messages/reports', {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.data && d.data.length){
+            var html = '';
+            d.data.forEach(function(msg){
+                var text = msg.text || '';
+                var title = text.split('\\n')[0] || '康复报告';
+                var time = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN') : '';
+                html += '<div class="list-item" style="cursor:pointer;"><div class="avatar orange">📋<\/div><div class="list-content"><div class="list-name">'+escapeHtml(title)+'<\/div><div class="list-desc" style="font-size:12px;">'+time+'<\/div><\/div><\/div>';
+            });
+            app.querySelector('#report-list').innerHTML = html;
+            // Click handler for reports
+            (function(data){
+                var items = app.querySelectorAll('#report-list .list-item');
+                items.forEach(function(el,i){
+                    el.onclick = function(){ showReportContent(data[i].text); };
+                });
+            })(d.data);
+            app.querySelector('#report-card').style.display = 'block';
+        }
+    } catch(e){}
+}
+function showReportContent(text) {
+  if(!text) return;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;width:85%;max-width:350px;max-height:80vh;overflow-y:auto;"><div style="font-weight:600;margin-bottom:8px;font-size:16px;">📋 康复报告</div><div style="font-size:13px;white-space:pre-wrap;">'+escapeHtml(text)+'</div><button onclick="this.parentNode.parentNode.remove()" style="margin-top:12px;background:#ff6b35;color:#fff;border:none;padding:8px 30px;border-radius:20px;font-size:15px;cursor:pointer;">关闭</button></div>';
+  document.body.appendChild(d);
+}
 function init() {
     const tabbar = document.getElementById('tabbar');
     tabbar.innerHTML = TABBAR_LIST.map(t => `<div class="tab-item" data-tab="${t.key}"><div class="ic">${t.icon}</div><div>${t.text}</div></div>`).join('');

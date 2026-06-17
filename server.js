@@ -1348,6 +1348,14 @@ app.post('/api/doctor/send-periodic-report', auth, async (req, res) => {
     res.json({ ok: true, sentTo: sentTo });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 获取康复报告消息 ──
+app.get('/api/messages/reports', auth, async (req, res) => {
+  try {
+    var msgs = await messagesCollection.find({ to: req.phone, text: { $regex: /^【(月度|季度)康复报告】/ } }).sort({ timestamp: -1 }).limit(10).toArray();
+    res.json({ data: msgs });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

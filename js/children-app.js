@@ -672,6 +672,7 @@ PAGES.messages = (app) => {
             <div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."></div><div class="header-brand"><div class="header-title">消息</div><div class="header-subtitle">${contacts.length} 位联系人</div></div><div class="header-add" id="add-contact-btn">＋</div></div>
             <div class="card" style="margin-bottom:8px;"><div class="form-row" style="border:none;"><span>🔍</span><input id="friend-search-input" class="form-input" placeholder="输入手机号搜索好友" style="flex:1;" /><button class="btn btn-primary" id="search-friend-btn" style="padding:6px 12px;">搜索</button></div><div id="search-result"></div></div><div class="banner orange" id="group-list-btn"><div class="emoji">👥</div><div><div class="t">群聊</div><div class="s">点击查看我的群聊</div></div></div>
             <div class="banner" id="assistant-btn"><div class="emoji">🤖</div><div><div class="t">安全助手</div><div class="s">智能健康顾问（支持语音）</div></div></div><div class="banner orange" id="ai-algorithm-btn" style="margin-top:4px;"><div class="emoji">🧠</div><div><div class="t">智能算法</div><div class="s">基于健康数据的营养运动建议</div></div></div>
+            <div class="card" id="report-card" style="margin-bottom:8px;display:none;"><div class="card-title">📋 康复报告</div><div id="report-list"></div></div>
             <div class="card" id="friend-requests-card" style="display:none;"><div class="card-title">📩 好友请求</div><div id="friend-requests-list"></div></div>
             <div class="card" id="friends-card" style="display:none;"><div class="card-title">👥 我的好友</div><div id="friends-list"><div class="text-muted" style="text-align:center;padding:12px;">加载中...</div></div></div>
             <div class="card" id="contacts-list">${contacts.map(c => `<div class="list-item" data-name="${escapeHtml(c.name)}"><div class="avatar ${c.bg || ''}">${c.avatar}</div><div class="list-content"><div class="list-name">${escapeHtml(c.name)}</div><div class="list-desc">${escapeHtml(latestMessageDescapeHtml(c.name))}</div></div><div class="list-time">${c.time}</div><button class="edit-contact-btn" data-name="${escapeHtml(c.name)}" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px;">✎</button></div>`).join('')}</div>
@@ -682,6 +683,7 @@ PAGES.messages = (app) => {
     app.querySelector('#group-list-btn').onclick = () => navigate('group-list');
     app.querySelector('#assistant-btn').onclick = () => navigate('assistant');
     app.querySelector('#ai-algorithm-btn').onclick = () => navigate('ai-chat');
+        loadReports(app);
     app.querySelector('#search-friend-btn').onclick = searchFriend;
     document.getElementById('friend-search-input').onkeypress = function(e) { if(e.key==='Enter') searchFriend(); };
     // Load friend requests and friends
@@ -2133,7 +2135,39 @@ async function searchFriend() {
 }
 
 
-function init() {
+
+
+// ── 加载康复报告 ──
+async function loadReports(app) {
+    if(!currentUser){ return; }
+    try {
+        var res = await fetch(API_BASE+'/api/messages/reports', {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.data && d.data.length){
+            var html = '';
+            d.data.forEach(function(msg){
+                var text = msg.text || '';
+                var title = text.split('\\n')[0] || '康复报告';
+                var time = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN') : '';
+                html += '<div class="list-item" style="cursor:pointer;"><div class="avatar orange">📋<\/div><div class="list-content"><div class="list-name">'+escapeHtml(title)+'<\/div><div class="list-desc" style="font-size:12px;">'+time+'<\/div><\/div><\/div>';
+            });
+            app.querySelector('#report-list').innerHTML = html;
+            (function(data2){
+                app.querySelectorAll('#report-list .list-item').forEach(function(el,i){
+                    el.onclick = function(){ showReportContent(data2[i].text); };
+                });
+            })(d.data);
+            app.querySelector('#report-card').style.display = 'block';
+        }
+    } catch(e){}
+}
+function showReportContent(text) {
+  if(!text) return;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  d.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px;width:85%;max-width:350px;max-height:80vh;overflow-y:auto;"><div style="font-weight:600;margin-bottom:8px;font-size:16px;">📋 康复报告</div><div style="font-size:13px;white-space:pre-wrap;">'+escapeHtml(text)+'</div><button onclick="this.parentNode.parentNode.remove()" style="margin-top:12px;background:#ff6b35;color:#fff;border:none;padding:8px 30px;border-radius:20px;font-size:15px;cursor:pointer;">关闭</button></div>';
+  document.body.appendChild(d);
+}function init() {
     const tabbar = document.getElementById('tabbar');
     tabbar.innerHTML = TABBAR_LIST.map(t => `<div class="tab-item" data-tab="${t.key}"><div class="ic">${t.icon}</div><div>${t.text}</div></div>`).join('');
     tabbar.querySelectorAll('.tab-item').forEach(el => el.onclick = () => navigate(el.dataset.tab));
