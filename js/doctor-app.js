@@ -373,6 +373,14 @@ PAGES.home = (app) => {
                 <div id="bind-result"></div>
                 <div id="bound-patients"><div class="text-muted" style="text-align:center;padding:12px;" id="no-patients-msg">暂无绑定患者</div></div>
             </div>
+            <div class="card"><div class="card-title">⚡ 快捷功能区</div>
+                <div class="grid-2">
+                    <div class="feature-tile orange" data-go="doctor-send-prescription"><div class="fi">📝</div><div class="fn">快捷开方</div></div>
+                    <div class="feature-tile blue" data-go="batch-reply"><div class="fi">📨</div><div class="fn">批量回复</div></div>
+                    <div class="feature-tile green" data-go="ai-prescription"><div class="fi">📋</div><div class="fn">康复报告</div></div>
+                    <div class="feature-tile purple" data-go="export-data"><div class="fi">📥</div><div class="fn">数据导出</div></div>
+                </div>
+            </div>
             <div class="card"><div class="card-title">快速统计</div><div id="work-stat"><div class="text-muted" style="text-align:center;padding:12px;">连接服务器后可查看统计数据</div></div></div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
@@ -2370,7 +2378,123 @@ async function loadPatientRecords(app, phone) {
 
 
 PAGES['received-history'] = (app) => { setNavTitle('患者病史'); app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">患者病史<\/div><div class="header-subtitle">查看患者发送的健康信息<\/div><\/div><\/div><div id="hist-list"><div class="text-muted" style="text-align:center;padding:20px;">加载中...<\/div><\/div><\/div>'; loadReceivedHistories(app); }; async function loadReceivedHistories(app) { if(!currentUser){ app.querySelector('#hist-list').innerHTML='<div class="text-muted" style="text-align:center;padding:20px;">请先登录<\/div>'; return; } try { var res = await fetch(API_BASE+'/api/medical-history/received', {headers:{Authorization:'Bearer '+currentUser.token}}); var d = await res.json(); if(d.data && d.data.length) { var html = ''; d.data.forEach(function(r){ var bi=r.basicInfo||{}; var hi=r.healthInfo||{}; html += '<div class="card" style="margin-bottom:8px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:8px;"><div class="avatar orange">👤<\/div><div style="flex:1;"><div style="font-weight:600;font-size:16px;">'+escapeHtml(r.patientName||'未知')+' ('+escapeHtml(r.from)+')<\/div><div style="font-size:12px;color:var(--gray);">'+(r.sentAt?new Date(r.sentAt).toLocaleString('zh-CN'):'')+'<\/div><\/div><\/div><div style="margin-bottom:6px;"><strong>👤 基础信息:<\/strong> 年龄 '+(bi.age||'-')+' · 性别 '+(bi.gender||'-')+' · '+(bi.occupation||'-')+' · 收入 '+(bi.incomeLevel||'-')+'<\/div><div style="margin-bottom:6px;"><strong>🏥 健康信息:<\/strong><\/div><div style="font-size:13px;margin:2px 0;padding-left:8px;">慢病史: '+(hi.chronicDiseases||'无')+'<\/div><div style="font-size:13px;margin:2px 0;padding-left:8px;">用药史: '+(hi.medicationHistory||'无')+'<\/div><div style="font-size:13px;margin:2px 0;padding-left:8px;">过敏史: '+(hi.allergies||'无')+'<\/div><div style="font-size:13px;margin:2px 0;padding-left:8px;">手术史: '+(hi.surgeryHistory||'无')+'<\/div>'+(r.medicalReports?'<div style="margin-top:4px;"><strong>📄 体检报告:<\/strong><br><span style="font-size:13px;">'+escapeHtml(r.medicalReports)+'<\/span><\/div>':'')+(r.exerciseRecords?'<div style="margin-top:4px;"><strong>🏃 运动记录:<\/strong><br><span style="font-size:13px;">'+escapeHtml(r.exerciseRecords)+'<\/span><\/div>':'')+(r.nutritionData?'<div style="margin-top:4px;"><strong>🥗 营养摄入:<\/strong><br><span style="font-size:13px;">'+escapeHtml(r.nutritionData)+'<\/span><\/div>':'')+'<\/div>'; }); app.querySelector('#hist-list').innerHTML = html; } else { app.querySelector('#hist-list').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">📥<\/div><div class="text-muted">暂无患者发送病史<\/div><\/div>'; } } catch(e){ app.querySelector('#hist-list').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div style="font-size:48px;margin-bottom:12px;">⚠️<\/div><div class="text-muted" style="color:var(--red);">加载失败<\/div><\/div>'; } }
-// ========== 初始化 ==========
+
+PAGES['batch-reply'] = (app) => {
+    setNavTitle('批量回复');
+    app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">批量回复<\/div><div class="header-subtitle">选择多位患者，群发消息<\/div><\/div><\/div><div class="card"><div class="card-title">👥 选择患者（点击选中）<\/div><div id="batch-friends"><div class="text-muted" style="text-align:center;padding:16px;">加载好友列表...<\/div><\/div><\/div><div id="batch-msg-area" style="display:none;"><div class="card"><div class="card-title">📝 回复内容<\/div><textarea id="batch-msg" class="form-input" rows="3" placeholder="输入要群发的消息..."><\/textarea><\/div><button class="btn btn-primary btn-block" id="batch-send-btn">📨 发送给选中患者<\/button><div id="batch-result"><\/div><\/div><\/div>';
+    loadBatchFriends(app);
+};
+async function loadBatchFriends(app) {
+    if(!currentUser){ app.querySelector('#batch-friends').innerHTML='<div class="text-muted" style="text-align:center;padding:16px;">请先登录<\/div>'; return; }
+    try {
+        var res = await fetch(API_BASE+'/api/friends', {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.data && d.data.length){
+            var html = '';
+            d.data.forEach(function(f,i){
+                var nm = f.name || f.phone;
+                html += '<div class="list-item" data-idx="'+i+'" onclick="this.classList.toggle(\'selected\');updateBatchBtn();"><div class="avatar">👤<\/div><div class="list-content"><div class="list-name">'+escapeHtml(nm)+'<\/div><div class="list-desc">'+escapeHtml(f.phone)+'<\/div><\/div><div class="check-box"><\/div><\/div>';
+            });
+            app.querySelector('#batch-friends').innerHTML = html;
+            app.querySelector('#batch-msg-area').style.display = 'block';
+        } else {
+            app.querySelector('#batch-friends').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div class="text-muted">暂无好友<\/div><\/div>';
+        }
+    } catch(e){
+        app.querySelector('#batch-friends').innerHTML = '<div class="text-muted" style="text-align:center;padding:16px;color:var(--red);">加载失败<\/div>';
+    }
+}
+window.updateBatchBtn = function(){
+    var selected = document.querySelectorAll('#batch-friends .selected');
+    var btn = document.getElementById('batch-send-btn');
+    if(btn) btn.textContent = '📨 发送给 ' + selected.length + ' 位患者';
+};
+window.sendBatchReply = async function(){
+    var selected = document.querySelectorAll('#batch-friends .selected');
+    var msg = document.getElementById('batch-msg').value.trim();
+    if(selected.length === 0){ toast('请选择患者'); return; }
+    if(!msg){ toast('请输入消息内容'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    var phones = [];
+    selected.forEach(function(el){
+        var idx = el.getAttribute('data-idx');
+        // Get phone from the list-item's list-desc text
+        var desc = el.querySelector('.list-desc');
+        if(desc) phones.push(desc.textContent.trim());
+    });
+    document.getElementById('batch-send-btn').textContent = '⏳ 发送中...';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/batch-reply', {
+            method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+currentUser.token},
+            body:JSON.stringify({to:phones, text:msg})
+        });
+        var d = await res.json();
+        if(d.ok){ toast('已发送给 '+d.count+' 位患者'); document.getElementById('batch-result').innerHTML = '<div style="color:green;text-align:center;padding:8px;">✅ 发送成功 ('+d.count+' 人)<\/div>'; }
+        else toast(d.error||'发送失败');
+    } catch(e){ toast('网络错误'); }
+    document.getElementById('batch-send-btn').textContent = '📨 发送给选中患者';
+};    document.getElementById('batch-send-btn').onclick = sendBatchReply;
+
+PAGES['export-data'] = (app) => {
+    setNavTitle('数据导出');
+    app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">数据导出<\/div><div class="header-subtitle">导出患者健康数据<\/div><\/div><\/div><div class="card"><div class="card-title">选择患者<\/div><div class="form-row"><input id="export-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" \/><button class="btn btn-primary" id="export-search-btn" style="padding:6px 12px;">搜索<\/button><\/div><div id="export-patient-info"><\/div><\/div><div id="export-content" style="display:none;"><button class="btn btn-primary btn-block" id="export-all-btn">📥 导出全部数据<\/button><div id="export-result"><\/div><\/div><\/div>';
+    app.querySelector('#export-search-btn').onclick = function(){ loadExportData(app); };
+    app.querySelector('#export-phone').onkeypress = function(e){ if(e.key==='Enter') loadExportData(app); };
+    app.querySelector('#export-all-btn').onclick = function(){ showExportResult(app); };
+    var exportDataCache = null;
+};
+async function loadExportData(app) {
+    var phone = app.querySelector('#export-phone').value.trim();
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    app.querySelector('#export-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;">查询中...<\/div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/export-data/'+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.ok && d.data){
+            var p = d.data.basicInfo || {};
+            app.querySelector('#export-patient-info').innerHTML = '<div class="form-row" style="border:1px solid var(--green);border-radius:8px;padding:10px;margin-top:8px;"><span>✅<\/span><div style="flex:1;"><span style="font-weight:600;">'+escapeHtml(d.data.patientName||'未知')+' ('+escapeHtml(phone)+')<\/span><\/div><\/div>';
+            app.querySelector('#export-content').style.display = 'block';
+            window.exportDataCache = d.data;
+        } else {
+            app.querySelector('#export-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">未找到该患者<\/div>';
+        }
+    } catch(e){
+        app.querySelector('#export-patient-info').innerHTML = '<div class="text-muted" style="text-align:center;padding:8px;color:var(--red);">查询失败<\/div>';
+    }
+}
+window.showExportResult = function(){
+    var d = window.exportDataCache;
+    if(!d){ toast('请先搜索患者'); return; }
+    var text = '===== 患者数据导出 =====\n';
+    text += '姓名: ' + (d.patientName||'') + '\n';
+    text += '手机号: ' + (d.phone||'') + '\n';
+    text += '年龄: ' + (d.basicInfo.age||'') + '\n';
+    text += '性别: ' + (d.basicInfo.gender||'') + '\n';
+    text += '身高: ' + (d.basicInfo.height||'') + ' cm\n';
+    text += '体重: ' + (d.basicInfo.weight||'') + ' kg\n';
+    text += '\n--- 健康数据 ---\n';
+    var dates = Object.keys(d.healthRecords||{}).sort();
+    for(var i=dates.length-1;i>=Math.max(0,dates.length-7);i--){
+        var r = d.healthRecords[dates[i]] || {};
+        text += dates[i] + ': 心率='+(r.heartRate||'')+' 血压='+(r.bloodPressure||'')+' 血氧='+(r.bloodOxygen||'')+' 血糖='+(r.bloodSugar||'')+' 步数='+(r.steps||'')+' 睡眠='+(r.sleepHours||'')+'\n';
+    }
+    text += '\n--- 处方历史 ---\n';
+    if(d.prescriptionHistory && d.prescriptionHistory.length){
+        d.prescriptionHistory.forEach(function(rx){
+            text += (rx.savedAt?new Date(rx.savedAt).toLocaleString()+' ':'')+(rx.doctorName||'')+'\n';
+        });
+    } else { text += '无处方记录\n'; }
+    text += '\n--- 病史 ---\n';
+    if(d.medicalHistory && d.medicalHistory.basicInfo){
+        text += '年龄: '+(d.medicalHistory.basicInfo.age||'')+' 性别: '+(d.medicalHistory.basicInfo.gender||'')+'\n';
+    } else { text += '无病史记录\n'; }
+    document.getElementById('export-result').innerHTML = '<textarea class="form-input" rows="10" style="font-size:13px;font-family:monospace;margin-top:8px;">'+escapeHtml(text)+'<\/textarea><button class="btn btn-primary btn-block" style="margin-top:8px;" onclick="copyExport()">📋 复制数据<\/button>';
+};
+window.copyExport = function(){
+    var ta = document.querySelector('#export-result textarea');
+    if(ta){ ta.select(); document.execCommand('copy'); toast('已复制到剪贴板'); }
+};// ========== 初始化 ==========
 
 // ── 付费服务页面 ──
 PAGES.services = (app) => {

@@ -1237,6 +1237,39 @@ app.get('/api/medical-history/received', auth, async (req, res) => {
     res.json({ data: records });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 批量回复 ──
+app.post('/api/doctor/batch-reply', auth, async (req, res) => {
+  try {
+    const { to, text } = req.body;
+    if (!to || !Array.isArray(to) || to.length === 0) return res.status(400).json({ error: '缺少接收人' });
+    if (!text) return res.status(400).json({ error: '缺少消息内容' });
+    for (var phone of to) {
+      await messagesCollection.insertOne({ from: req.phone, to: phone, text, timestamp: new Date().toISOString(), read: false });
+    }
+    res.json({ ok: true, count: to.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── 数据导出 ──
+app.get('/api/doctor/export-data/:phone', auth, async (req, res) => {
+  try {
+    const patient = await usersCollection.findOne({ phone: req.params.phone });
+    if (!patient) return res.status(404).json({ error: '未找到患者' });
+    var profile = patient.data?.profile || {};
+    var records = patient.data?.dailyRecords || {};
+    var prescriptions = DB_prescriptions.filter(function(p){ return p.phone === req.params.phone; });
+    var hist = await medicalHistoriesCollection.findOne({ from: req.params.phone, to: req.phone });
+    var exportData = {
+      patientName: profile.name || '', phone: req.params.phone,
+      basicInfo: { age: profile.age || '', gender: profile.gender || '', height: profile.height || '', weight: profile.weight || '', hasChronic: !!profile.hasChronic },
+      healthRecords: records,
+      prescriptionHistory: prescriptions,
+      medicalHistory: hist || null
+    };
+    res.json({ ok: true, data: exportData });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
