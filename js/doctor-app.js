@@ -431,7 +431,7 @@ PAGES.sport = (app) => {
             </div>
             <div class="grid-2">
                 <div class="feature-tile orange" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看用户数据</div></div>
-                <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div><div class="feature-tile purple" data-go="patient-records"><div class="fi">📋</div><div class="fn">诊疗档案</div></div><div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div><div class="feature-tile blue" data-go="received-history"><div class="fi">📥</div><div class="fn">患者病史</div></div>
+                <div class="feature-tile purple" data-go="patient-records"><div class="fi">📋</div><div class="fn">诊疗档案</div></div><div class="feature-tile blue" data-go="received-history"><div class="fi">📥</div><div class="fn">患者病史</div></div>
             </div>
             <div class="card"><div class="card-title">最近联系的患者</div><div id="recent-patients"><div class="text-muted" style="text-align:center;padding:12px;">暂无记录</div></div></div>
         </div>`;
@@ -1590,6 +1590,12 @@ PAGES.prescription = (app) => {
                 <div class="feature-tile green" data-go="doctor-patient-data"><div class="fi">👥</div><div class="fn">查看患者数据</div></div>
             </div>
             <div class="card"><div class="card-title">已发送的处方</div><div id="sent-prescriptions"><div class="text-muted" style="text-align:center;padding:12px;">暂无已发送的处方记录</div></div></div>
+            <div class="card"><div class="card-title">📋 处方功能</div>
+                <div class="grid-2">
+                    <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
+                    <div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
+                </div>
+            </div>
         </div>`;
     app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
 };
