@@ -559,14 +559,55 @@ async function loadDashData(app) {
                     var vals = data.trends[key];
                     if(!vals || vals.every(function(v){return v===null;})) continue;
                     var maxVal = Math.max(maxVals[key] || 0, Math.max.apply(null, vals.filter(function(v){return v!==null;})) || 100) || 100;
-                    var bars = vals.map(function(v,i){
-                        if(v === null) return '<div style="width:'+(100/vals.length-2)+'%;height:2px;background:#eee;border-radius:2px;margin:0 1px;align-self:flex-end;"></div>';
-                        var hh = Math.min(100, Math.max(3, (v/maxVal)*100));
-                        var label = data.trends.dates[i] ? data.trends.dates[i].slice(5) : '';
-                        return '<div style="display:flex;flex-direction:column;align-items:center;width:'+(100/vals.length-1)+'%;"><div style="width:80%;height:'+hh+'px;background:'+(colors[key]||'#666')+';border-radius:4px 4px 0 0;min-height:3px;"></div><div style="font-size:10px;color:var(--gray);margin-top:2px;">'+label+'</div></div>';
-                    }).join('');
-                    var lastVal = vals[vals.length-1];
-                    html += '<div class="card" style="margin-bottom:6px;"><div class="row" style="border-bottom:1px solid #f0f0f0;padding-bottom:6px;margin-bottom:6px;"><div style="font-weight:600;font-size:14px;">'+(names[key]||key)+'</div><div style="font-size:20px;font-weight:700;color:'+(colors[key]||'#666')+';">'+(lastVal!==null&&lastVal!==undefined?lastVal:'--')+'</div></div><div style="display:flex;align-items:flex-end;height:100px;padding:4px 0;">'+bars+'</div></div>';
+                    var bounds = vals.filter(function(x){return x !== null;});
+var dataMin = bounds.length ? Math.min.apply(null, bounds) : 0;
+var dataMax = bounds.length ? Math.max.apply(null, bounds) : 100;
+var yMin = Math.max(0, dataMin - (dataMax - dataMin) * 0.2);
+var yMax = dataMax + (dataMax - dataMin) * 0.2 || 100;
+if(yMax === yMin) yMax = yMin + 10;
+var lastVal = vals[vals.length-1];
+var ptW = Math.min(300, Math.max(60, vals.length * 40));
+var pts = [];
+var labels = [];
+var axisStep = Math.max(1, Math.floor((vals.length - 1) / 6));
+for(var vi = 0; vi < vals.length; vi++){
+    var xPos = (vals.length > 1) ? (vi / (vals.length - 1)) * (ptW - 40) + 20 : ptW / 2;
+    var dateLabel = data.trends.dates[vi] ? data.trends.dates[vi].slice(5) : '';
+    labels.push(dateLabel);
+    if(vals[vi] !== null){
+        var yPos = 55 - ((vals[vi] - yMin) / (yMax - yMin)) * 45;
+        pts.push({x:xPos, y:yPos, v:vals[vi], label:dateLabel});
+    }
+}
+var polyline = '';
+if(pts.length > 1){
+    polyline = pts.map(function(p){return p.x+','+p.y;}).join(' ');
+}
+var dotCircles = '';
+var dotLabels = '';
+pts.forEach(function(p){
+    dotCircles += '<circle cx="'+p.x+'" cy="'+p.y+'" r="3.5" fill="'+(colors[key]||'#666')+'" stroke="#fff" stroke-width="1.5"/>';
+    if(vi % axisStep === 0) dotLabels += '<text x="'+p.x+'" y="68" text-anchor="middle" fill="var(--gray)" font-size="9">'+p.label+'</text>';
+});
+
+var lineHtml = '<div style="border-bottom:1px solid #f0f0f0;padding-bottom:6px;margin-bottom:6px;"><div style="font-weight:600;font-size:14px;">'+(names[key]||key)+'</div><div style="font-size:20px;font-weight:700;color:'+(colors[key]||'#666')+';">'+(lastVal!==null&&lastVal!==undefined?lastVal:'--')+'</div></div>';
+lineHtml += '<svg width="100%" height="75" viewBox="0 0 '+ptW+' 70" style="overflow:visible;">';
+lineHtml += '<rect x="0" y="0" width="'+ptW+'" height="70" fill="none"/>';
+if(polyline) lineHtml += '<polyline points="'+polyline+'" stroke="'+(colors[key]||'#666')+'" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+lineHtml += dotCircles;
+// Y axis labels
+lineHtml += '<text x="5" y="12" fill="var(--gray)" font-size="8">'+Math.round(yMax)+'</text>';
+lineHtml += '<text x="5" y="63" fill="var(--gray)" font-size="8">'+Math.round(yMin)+'</text>';
+lineHtml += '</svg>';
+// Labels below
+lineHtml += '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--gray);">';
+var liStep = Math.max(1, Math.floor(labels.length / 5));
+for(var lii = 0; lii < labels.length; lii += liStep){
+    lineHtml += '<span>'+labels[lii]+'</span>';
+}
+lineHtml += '</div>';
+
+html += '<div class="card" style="margin-bottom:6px;">'+lineHtml+'</div>';
                 }
                 app.querySelector('#dash-content').innerHTML = html;
             } else {
