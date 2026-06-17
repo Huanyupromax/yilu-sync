@@ -93,9 +93,9 @@ const storage = {
         const val = lsGet(KEYS.CONTACTS, null);
         if (val && Array.isArray(val)) return val;
         return [
-            { name: '女儿', avatar: '👩', bg: 'orange', time: '刚刚', phone: '13800001234' },
-            { name: '儿子', avatar: '👨', bg: '', time: '10:25', phone: '13900005678' },
-            { name: '老李', avatar: '👴', bg: 'orange', time: '昨天', phone: '13800000001' },
+            { name: '爸爸', avatar: '👨', bg: '', time: '刚刚', phone: '13800001234' },
+            { name: '妈妈', avatar: '👩', bg: '', time: '10:25', phone: '13900005678' },
+            { name: '叔叔', avatar: '👴', bg: '', time: '昨天', phone: '13800000001' },
             { name: '王教练', avatar: '🧑‍🏫', bg: '', time: '昨天', phone: '13800000002' },
             { name: '黑石礁社区', avatar: '🏘', bg: '', time: '2 天前', phone: '' }
         ];
@@ -613,7 +613,7 @@ PAGES.data = (app) => {
 ;
 
 // 单聊相关
-const DEFAULT_GREETINGS = { '女儿': [{text:'爸，今天看到您的运动简报啦',mine:false}], '儿子': [{text:'爸，您这两天血压稳定多了',mine:false}] };
+const DEFAULT_GREETINGS = { '爸爸': [{text:'爸，今天身体怎么样？',mine:false}], '妈妈': [{text:'妈，注意休息',mine:false}] };
 function latestMessageDescapeHtml(name) {
     const msgs = storage.getMessages(name);
     if (msgs.length) return msgs[msgs.length-1].text || '';
