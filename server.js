@@ -1278,6 +1278,57 @@ app.get('/api/doctor/export-data/:phone', auth, async (req, res) => {
     res.json({ ok: true, data: exportData });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── 处方动态调整 ──
+app.get('/api/doctor/prescription-analysis/:phone', auth, async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const patient = await usersCollection.findOne({ phone });
+    if (!patient) return res.status(404).json({ error: '未找到患者' });
+    const records = patient.data?.dailyRecords || {};
+    const dates = Object.keys(records).sort();
+    const recent = dates.slice(-60);
+    if (recent.length < 7) return res.json({ ok: true, data: null, message: '数据不足，需至少7天记录' });
+    var mid = Math.floor(recent.length / 2);
+    var first = recent.slice(0, mid), second = recent.slice(mid);
+    function calcAvg(key, fn) {
+      var f = first.map(function(d){ var v = records[d][key]; return fn ? fn(v) : v; }).filter(function(v){ return v != null && v !== '' && !isNaN(v); });
+      var s = second.map(function(d){ var v = records[d][key]; return fn ? fn(v) : v; }).filter(function(v){ return v != null && v !== '' && !isNaN(v); });
+      if (f.length < 2 || s.length < 2) return null;
+      var fa = f.reduce(function(a,b){return a+b;},0)/f.length;
+      var sa = s.reduce(function(a,b){return a+b;},0)/s.length;
+      return { firstAvg: Math.round(fa*10)/10, secondAvg: Math.round(sa*10)/10, change: Math.round((sa-fa)/fa*1000)/10 };
+    }
+    var hr = calcAvg('heartRate');
+    var sugar = calcAvg('bloodSugar');
+    var sleep = calcAvg('sleepHours');
+    var steps = calcAvg('steps');
+    var bp = calcAvg('bloodPressure', function(v){ return parseInt((v+'/').split('/')[0]); });
+    var analysis = {};
+    if (hr) analysis.heartRate = hr;
+    if (sugar) analysis.bloodSugar = sugar;
+    if (sleep) analysis.sleep = sleep;
+    if (steps) analysis.steps = steps;
+    if (bp) analysis.bloodPressure = bp;
+    var suggestions = [];
+    if (hr && Math.abs(hr.change) > 3) suggestions.push(hr.change < 0 ? '心率趋于平稳，可维持当前运动强度' : '心率有上升趋势，建议适当降低运动强度');
+    if (sugar && Math.abs(sugar.change) > 3) suggestions.push(sugar.change < 0 ? '血糖控制改善，继续保持' : '血糖有上升趋势，建议增加有氧运动');
+    if (sleep && Math.abs(sleep.change) > 5) suggestions.push(sleep.change > 0 ? '睡眠质量提升，可适当增加运动强度' : '睡眠时数减少，建议增加放松训练');
+    if (steps && Math.abs(steps.change) > 10) suggestions.push(steps.change > 0 ? '活动量增加，体能改善' : '活动量减少，建议适当增加日常活动');
+    if (!suggestions.length) suggestions.push('各项指标基本稳定，当前处方可以继续执行');
+    var curRx = patient.prescription ? (typeof patient.prescription === 'string' ? JSON.parse(patient.prescription) : patient.prescription) : null;
+    res.json({ ok: true, data: { analysis: analysis, suggestions: suggestions, currentPrescription: curRx, recordCount: recent.length } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post('/api/doctor/prescription/update', auth, async (req, res) => {
+  try {
+    const { phone, prescription, doctorNotes } = req.body;
+    if (!phone || !prescription) return res.status(400).json({ error: '缺少参数' });
+    await usersCollection.updateOne({ phone: phone }, { $set: { prescription: JSON.stringify(prescription), updatedAt: new Date() } });
+    DB_prescriptions.push({ phone: phone, prescription: prescription, doctorNotes: doctorNotes || '', doctorName: '医师', doctorPhone: req.phone, savedAt: new Date().toISOString() });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

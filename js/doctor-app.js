@@ -1589,7 +1589,7 @@ PAGES.prescription = (app) => {
             <div class="card"><div class="card-title">📋 处方功能</div>
                 <div class="grid-2">
                     <div class="feature-tile green" data-go="doctor-send-prescription"><div class="fi">📋</div><div class="fn">发送运动处方</div></div>
-                    <div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div>
+                    <div class="feature-tile purple" data-go="ai-prescription"><div class="fi">🤖</div><div class="fn">智能处方生成</div></div><div class="feature-tile orange" data-go="prescription-adjust"><div class="fi">📊</div><div class="fn">处方动态调整</div></div>
                 </div>
             </div>
 
@@ -2500,7 +2500,62 @@ window.showExportResult = function(){
 window.copyExport = function(){
     var ta = document.querySelector('#export-result textarea');
     if(ta){ ta.select(); document.execCommand('copy'); toast('已复制到剪贴板'); }
-};// ========== 初始化 ==========
+};
+PAGES['prescription-adjust'] = (app) => {
+    setNavTitle('处方动态调整');
+    app.innerHTML = '<div class="container"><div class="header"><div class="header-logo"><img src="images/logo.png" onerror="..."><\/div><div class="header-brand"><div class="header-title">处方动态调整<\/div><div class="header-subtitle">分析健康趋势，智能提醒调整处方<\/div><\/div><\/div><div class="card"><div class="card-title">选择患者<\/div><div class="form-row"><input id="adjust-phone" class="form-input" placeholder="输入患者手机号" style="flex:1;" \/><button class="btn btn-primary" id="adjust-search-btn" style="padding:6px 12px;">分析<\/button><\/div><\/div><div id="adjust-result"><\/div><\/div>';
+    app.querySelector('#adjust-search-btn').onclick = function(){ loadPrescriptionAnalysis(app); };
+    app.querySelector('#adjust-phone').onkeypress = function(e){ if(e.key==='Enter') loadPrescriptionAnalysis(app); };
+};
+
+async function loadPrescriptionAnalysis(app) {
+    var phone = app.querySelector('#adjust-phone').value.trim();
+    if(!phone){ toast('请输入手机号'); return; }
+    if(!currentUser){ toast('请先登录'); return; }
+    app.querySelector('#adjust-result').innerHTML = '<div class="text-muted" style="text-align:center;padding:20px;">分析中...<\/div>';
+    try {
+        var res = await fetch(API_BASE+'/api/doctor/prescription-analysis/'+encodeURIComponent(phone), {headers:{Authorization:'Bearer '+currentUser.token}});
+        var d = await res.json();
+        if(d.ok && d.data){
+            var a = d.data.analysis || {};
+            var sug = d.data.suggestions || [];
+            var rx = d.data.currentPrescription;
+            var html = '';
+            // Analysis section
+            html += '<div class="card"><div class="card-title">📊 健康趋势分析<\/div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+            if(a.heartRate) html += '<div class="info-pill" style="background:#fef2f2;"><div class="fs-28 fw-600">'+a.heartRate.secondAvg+' ('+ (a.heartRate.change>0?'▲':'▼') + Math.abs(a.heartRate.change)+'%)<\/div><div style="font-size:12px;">心率 (次/分)<\/div><\/div>';
+            if(a.bloodSugar) html += '<div class="info-pill" style="background:#fefce8;"><div class="fs-28 fw-600">'+a.bloodSugar.secondAvg+' ('+ (a.bloodSugar.change>0?'▲':'▼') + Math.abs(a.bloodSugar.change)+'%)<\/div><div style="font-size:12px;">血糖 (mmol/L)<\/div><\/div>';
+            if(a.sleep) html += '<div class="info-pill" style="background:#ede9fe;"><div class="fs-28 fw-600">'+a.sleep.secondAvg+' ('+ (a.sleep.change>0?'▲':'▼') + Math.abs(a.sleep.change)+'%)<\/div><div style="font-size:12px;">睡眠 (小时)<\/div><\/div>';
+            if(a.steps) html += '<div class="info-pill" style="background:#dbeafe;"><div class="fs-28 fw-600">'+a.steps.secondAvg+' ('+ (a.steps.change>0?'▲':'▼') + Math.abs(a.steps.change)+'%)<\/div><div style="font-size:12px;">步数<\/div><\/div>';
+            if(a.bloodPressure) html += '<div class="info-pill" style="background:#fce7f3;"><div class="fs-28 fw-600">'+a.bloodPressure.secondAvg+' ('+ (a.bloodPressure.change>0?'▲':'▼') + Math.abs(a.bloodPressure.change)+'%)<\/div><div style="font-size:12px;">收缩压 (mmHg)<\/div><\/div>';
+            html += '<\/div><div style="font-size:12px;color:var(--gray);margin-top:4px;">基于 '+d.data.recordCount+' 天数据分析<\/div><\/div>';
+            // Suggestions
+            html += '<div class="card"><div class="card-title">💡 调整建议<\/div><div>';
+            sug.forEach(function(s,i){
+                html += '<div style="padding:6px;margin-bottom:4px;background:var(--orange-light);border-radius:6px;font-size:14px;">'+(i+1)+'. '+escapeHtml(s)+'<\/div>';
+            });
+            html += '<\/div><\/div>';
+            // Current prescription
+            if(rx){
+                html += '<div class="card"><div class="card-title">📋 当前处方<\/div><div id="current-rx">';
+                html += '<div style="margin-bottom:4px;"><strong>运动目标:</strong> '+escapeHtml(rx.goal||'')+'<\/div>';
+                html += '<div style="margin-bottom:4px;"><strong>强度:</strong> '+escapeHtml(rx.intensity||'')+' | <strong>心率:</strong> ≤'+escapeHtml(rx.maxHeartRate||'')+'<\/div>';
+                html += '<div style="margin-bottom:4px;"><strong>频率:</strong> '+escapeHtml(rx.frequency||'')+' | <strong>时长:</strong> '+escapeHtml(rx.duration||'')+'<\/div>';
+                html += '<div style="margin-bottom:4px;"><strong>注意事项:</strong> '+escapeHtml(rx.cautions||'')+'<\/div>';
+                html += '<button class="btn btn-primary btn-block" id="adjust-rx-btn" style="margin-top:8px;">✏️ 手动调整处方<\/button><\/div>'+'<\/div>';
+            } else {
+                html += '<div class="card"><div class="card-title">📋 当前处方<\/div><div class="text-muted" style="text-align:center;padding:12px;">暂无处方记录<\/div><\/div>';
+            }
+            app.querySelector('#adjust-result').innerHTML = html;
+            var abtn = document.getElementById('adjust-rx-btn');
+            if(abtn) abtn.onclick = function(){ navigate('doctor-send-prescription',{phone:phone}); };
+        } else {
+            app.querySelector('#adjust-result').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div class="text-muted">'+(d.message||'暂无足够数据')+'<\/div><\/div>';
+        }
+    } catch(e){
+        app.querySelector('#adjust-result').innerHTML = '<div class="card" style="text-align:center;padding:20px;"><div class="text-muted" style="color:var(--red);">分析失败<\/div><\/div>';
+    }
+}// ========== 初始化 ==========
 
 // ── 付费服务页面 ──
 PAGES.services = (app) => {
