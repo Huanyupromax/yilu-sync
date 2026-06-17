@@ -445,6 +445,8 @@ PAGES.sport = (app) => {
           })
           .catch(function(){ toast('搜索失败'); });
     };
+
+    app.querySelectorAll('[data-go]').forEach(el => el.onclick = () => navigate(el.dataset.go));
 };
 
 PAGES.data = (app) => {
